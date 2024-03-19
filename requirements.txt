@@ -1,0 +1,8 @@
+torch
+torchvision
+torchtext
+transoformer
+einops
+sentencepiece
+numpy
+tensorflow
