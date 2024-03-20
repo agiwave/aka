@@ -16,7 +16,7 @@ def RetentionBlock(args):
         self.key_dim = self.embed_dim // self.num_heads
         self.scaling = self.key_dim**-0.5
         self.rot_embedding = getattr(args.attn_args, 'rotary_embedding', False),
-        self.gate_fn = getattr(np, 'gate_fn')
+        self.gate_fn = getattr(np, gate_fn)
 
         self.q_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=use_bias)
         self.k_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=use_bias)
@@ -28,14 +28,9 @@ def RetentionBlock(args):
             self.decay_proj = nn.Linear(self.num_heads, self.num_heads, bias=False)
         else:
             self.decay_proj = None
-
-        angle = 1.0 / (
-            10000 ** np.linspace(0, 1, self.embed_dim // self.num_heads // 2)
-        )
-        self.angle = angle.unsqueeze(-1).repeat(1, 2).flatten()
         return self
 
-    def compute_mask(self, slen, latent_dim, num_heads, get_decay_scale=True, retention_mask=None, mode='parallel'):
+    def compute_mask(slen, latent_dim, num_heads, get_decay_scale=True, retention_mask=None, mode='parallel'):
         angle = 1.0 / (
             10000 ** np.linspace(0, 1, latent_dim // num_heads // 2)
         )
@@ -44,8 +39,8 @@ def RetentionBlock(args):
             1 - 2 ** (-5 - np.arange(num_heads, dtype=np.float))
         )
         if mode == "recurrent":
-            sin = np.sin(self.angle * (slen - 1))
-            cos = np.cos(self.angle * (slen - 1))
+            sin = np.sin(angle * (slen - 1))
+            cos = np.cos(angle * (slen - 1))
             retention_rel_pos = (decay.view(1, -1, 1, 1).exp(), None, None)
         else:
             index = np.arange(slen).to(decay)
@@ -151,15 +146,17 @@ def RetentionBlock(args):
 
         mode = 'parallel' if T > 1 else 'recurrent'
         if state is not None:
-            if mode in state:
-                ((cos, sin), (decay_mask, intra_decay, scale)) = state[mode]
+            mask = state.get(mode, None)
+            if mask is not None:
+                ((cos,_),_) = mask
                 if cos.size(0) != T:
-                    ((cos, sin), (decay_mask, intra_decay, scale)) = compute_mask(self, T, self.embed_dim, self.num_heads, mode=mode)
-            else:
-                ((cos, sin), (decay_mask, intra_decay, scale)) = compute_mask(self, T, self.embed_dim, self.num_heads, mode=mode)
-            state[mode] = ((cos, sin), (decay_mask, intra_decay, scale))
+                    mask = None
+            if mask is None:
+                mask = compute_mask(T, self.embed_dim, self.num_heads, mode=mode)
+                state[mode] = mask
         else:
-            ((cos, sin), (decay_mask, intra_decay, scale)) = compute_mask(self, T, self.embed_dim, self.num_heads, mode=mode)
+            mask = compute_mask(T, self.embed_dim, self.num_heads, mode=mode)
+        ((cos, sin), (decay_mask, intra_decay, scale)) = mask
 
         q, k, v, g = [proj(hidden_states) for proj in [self.q_proj, self.k_proj, self.v_proj, self.g_proj]]
         q, k, v = [t.view(B, T, self.num_heads, -1) for t in [q,k,v]]
@@ -255,7 +252,7 @@ def RetNet(name):
         mlp_args = Args(
             kv_size = cfg['decoder_ffn_embed_dim'],
             kv_gate = cfg['use_glu'],
-            activation = cfg['activation_fn']    # gelu, rms, layernorm
+            activation = cfg['activation_fn']
         ),
         attn_args = Args(
             num_heads = cfg['decoder_retention_heads'],

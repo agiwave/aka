@@ -3,7 +3,7 @@ os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 import aka.numpy
 
-def exists(*args, **kwargs):
+def exist(*args, **kwargs):
     return join(*args, _raise_exceptions_for_missing_entries=False, **kwargs) is not None
 
 def join(*args, _raise_exceptions_for_missing_entries=True, **kwargs):
