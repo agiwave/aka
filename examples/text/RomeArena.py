@@ -30,7 +30,7 @@ def TrainArena(names, train_args):
 
     # -- Data loader
     dataset = repo.AutoDataset('text', data_dir='data/text', split='train')
-    dataloader = aka.data.StreamingLoader(
+    dataloader = aka.data.TextStreamingLoader(
                     dataset, 
                     tokenizer=tokenizer, 
                     n_tokens=512,

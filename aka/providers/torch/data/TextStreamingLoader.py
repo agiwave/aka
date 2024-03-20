@@ -1,6 +1,6 @@
 import aka.numpy as np
 
-class StreamingLoader:
+class TextStreamingLoader:
     def __init__(self, dataset, tokenizer, n_tokens, batch_size, data_mapper=None):
         self.dataset = dataset
         self.tokenizer = tokenizer

@@ -41,7 +41,7 @@ if __name__ == "__main__":
         batch_size = 12, # if gradient_accumulation_steps > 1, this is the micro-batch size
         epochs=5
     )
-    dataloader = aka.data.StreamingLoader(
+    dataloader = aka.data.TextStreamingLoader(
                     dataset['train'], 
                     tokenizer=tokenizer, 
                     n_tokens=512, 

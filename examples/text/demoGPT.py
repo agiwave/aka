@@ -39,7 +39,7 @@ if __name__ == "__main__":
         batch_size = 12,
         epochs=21
     )
-    dataloader = aka.data.StreamingLoader(
+    dataloader = aka.data.TextStreamingLoader(
                     dataset['train'], 
                     tokenizer=tokenizer, 
                     n_tokens=512, 
