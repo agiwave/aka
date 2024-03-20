@@ -1,6 +1,16 @@
 import aka.nn as nn
 import aka.numpy as np
 
+def Topk(n_topk, *, dim=-1):
+    def forward(self, x):
+        dim = self.dim
+        n_topk = self.n_topk
+        v, indics = np.topk(x, n_topk, dim=dim)
+        v = np.select(v, dim=dim, index=n_topk-1).unsqueeze(dim=dim)
+        x = np.where(x<v,float('-inf'), x)
+        return np.softmax(x, dim=dim)
+    return __init__(nn.Module(forward=forward, n_topk=n_topk, dim=dim))
+
 def KV(kv_size, k_dim, v_dim, gate=True, num_heads=1, act="gelu"):
     def __init__(self):
         assert k_dim % num_heads == 0 and v_dim % num_heads == 0
@@ -9,7 +19,7 @@ def KV(kv_size, k_dim, v_dim, gate=True, num_heads=1, act="gelu"):
         self.k = nn.Parameter(shape=(num_heads, kv_size, k_dim//num_heads), initializer='xavier_uniform')
         self.v = nn.Parameter(shape=(num_heads, kv_size, v_dim//num_heads), initializer='xavier_uniform')
         self.gate = None if not gate else nn.Parameter(shape=(num_heads, kv_size, k_dim//num_heads), initializer='xavier_uniform')
-        self.act = np.activation(act)
+        self.act = getattr(np,act)
         return self
 
     def forward(self, x):

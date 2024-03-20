@@ -34,6 +34,7 @@ def array(data, *args, **kwargs):
     return tensor(data, *args, **kwargs)
     
 repeat = repeat_interleave
+swish = silu
 def iden(inputs):
     return inputs
 
@@ -49,18 +50,3 @@ def rearrange(equation, *operands, **kwargs):
         return einops.rearrange(*operands, equation, **kwargs)
     else:
         return einops.rearrange(operands, equation, **kwargs)
-
-def activation(name):
-    match name:
-        case 'relu':
-            return relu
-        case 'gelu':
-            return gelu
-        case 'sigmoid':
-            return sigmoid
-        case 'swish':
-            return silu
-        case 'softmax':
-            return softmax
-        case _:
-            assert False, f"Unknown activation {act} founded."

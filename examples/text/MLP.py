@@ -34,23 +34,7 @@ def MLPBlock(args):
         qk_dim = getattr(args, 'qk_dim', latent_dim)
         hidden_dim = getattr(args, 'hidden_dim', latent_dim)
         act = getattr(args, 'activation', 'gelu')
-
-        def Swish():
-            def forward(self, x):
-                return np.silu(x)
-            return nn.Module(forward=forward)
-
-        match act:
-            case 'gelu':
-                act = nn.GELU()
-            case 'swish':
-                act = Swish()
-            case 'layernorm':
-                act = nn.LayerNorm(kv_size)
-            case _:
-                act = None
-
-        self.act = act
+        self.act = getattr(np, 'act')
         self.in_proj = None if qk_dim == latent_dim else nn.Linear(latent_dim, qk_dim, bias=bias)   # Q
         self.up_proj = nn.Linear(qk_dim, kv_size, bias=bias)                                        # K(reversed)
         self.gate_proj = None if not kv_gate else nn.Linear(qk_dim, kv_size, bias=bias)             # G or mask

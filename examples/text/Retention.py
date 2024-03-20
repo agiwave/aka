@@ -14,16 +14,6 @@ def RetentionBlock(args):
             eps = eps,
             weight = nn.Parameter(np.ones(dim)))
 
-    def get_activation_fn(activation):
-        if activation == "relu":
-            return np.relu
-        elif activation == "gelu":
-            return np.gelu
-        elif activation == "swish":
-            return np.silu
-        else:
-            raise NotImplementedError
-
     def __init__(self,args):
         # config: RetNetConfig,
         gate_fn="swish"
@@ -37,7 +27,7 @@ def RetentionBlock(args):
         self.key_dim = self.embed_dim // self.num_heads
         self.scaling = self.key_dim**-0.5
         self.rot_embedding = getattr(args.attn_args, 'rotary_embedding', False),
-        self.gate_fn = get_activation_fn(activation=str(gate_fn))
+        self.gate_fn = getattr(np, 'gate_fn')
 
         self.q_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=use_bias)
         self.k_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=use_bias)
