@@ -89,7 +89,7 @@ def CausalLM(args):
         layer_losses = []
         for i in range(len(self.layers)):
             l_state = None if state is None else layer_states[i]
-            x, loss = self.layers[i](x, targets=targets, gctx=gctx, state=l_state)
+            x, loss = self.layers[i](x, gctx=gctx, state=l_state)
             if loss is not None:
                 layer_losses.append(loss)
 
@@ -189,22 +189,3 @@ if __name__ == "__main__":
     # RunArena([
     #     'CausalLM-demo'
     # ], "Paul Daniels (born 4 June 1981 in Burlington)")
-
-
-# if len(prompt_tokens) > 1:
-#     self(np.array([prompt_tokens[:-1]]), state=state)
-# input_token_ids = np.array([prompt_tokens])
-# for _ in range(max_length):
-#     outputs = self(input_token_ids, state=state)
-#     output_token_ids = np.argmax(outputs[:,-1:,:], dim=-1)
-#     cache = cache + output_token_ids[0].tolist()
-#     if self.tokenizer.eos_token_id in input_token_ids:
-#         break
-
-#     word = self.tokenizer.decode(cache)
-#     word_token_ids = self.tokenizer.encode(word)
-#     if cache == word_token_ids:
-#         cache = []
-#         yield word
-
-#     input_token_ids = np.cat([input_token_ids, output_token_ids], dim=1)

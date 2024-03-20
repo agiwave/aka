@@ -11,7 +11,18 @@ from aka.nn import Args
 def TrainArena(names, train_args):
     # -- Tokenizer --
     tokenizer = repo.AutoTokenizer('data/mamba-370m-hf')
-
+    # class Tokenizer:
+    #     def __init__(self, path):
+    #         from sentencepiece import SentencePieceProcessor
+    #         self.tokenizer = SentencePieceProcessor('data/Gemma/tokenizer.model')
+    #         self.bos_token_id = self.tokenizer.bos_id()
+    #         self.eos_token_id = self.tokenizer.eos_id()
+    #     def encode(self, s):
+    #         return self.tokenizer.encode(s)
+    #     def decode(self, s):
+    #         return self.tokenizer.decode(s)
+    # vocab_size = 256000
+    
     # -- Roles --
     roles = [Args(name=name) for name in names]
     import importlib

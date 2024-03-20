@@ -57,19 +57,7 @@ def PredictionBlock(args):
     return __init__(nn.Module(forward=forward), args)
 
 def PredictionArgs(name):
-    class Tokenizer:
-        def __init__(self, path):
-            from sentencepiece import SentencePieceProcessor
-            self.tokenizer = SentencePieceProcessor(path)
-            self.bos_token_id = self.tokenizer.bos_id()
-            self.eos_token_id = self.tokenizer.eos_id()
-        def encode(self, s):
-            return self.tokenizer.encode(s)
-        def decode(self, s):
-            return self.tokenizer.decode(s)
-
     args = Args(
-        tokenizer = Tokenizer('data/Gemma/tokenizer.model'),
         vocab_size = 256000,
         vocab_dim = 32,
         latent_dim = 384,
