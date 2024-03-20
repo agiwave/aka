@@ -1,6 +1,7 @@
 
 import aka.nn as nn
 import aka.numpy as np
+from aka.nn import Args
 
 # https://blog.csdn.net/wizardforcel/article/details/132206172
 def AFTFullBlock(args):
@@ -147,10 +148,6 @@ def AFTLocal(args):
         return Yt
 
     return __init__(nn.Module(forward=forward), args)
-
-class Args():
-    def __init__(self, **kwargs): 
-        for key in kwargs: setattr(self, key, kwargs[key])
 
 if __name__ == "__main__":
     from RomeArena import TrainArena

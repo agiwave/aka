@@ -3,6 +3,7 @@
 import aka.nn as nn
 import aka.repo as repo
 import aka.data
+from aka.nn import Args
 
 if __name__ == "__main__":
     tokenizer = repo.AutoTokenizer('data/mamba-370m-hf')
@@ -10,10 +11,6 @@ if __name__ == "__main__":
         'data/wiki/wiki.txt',
         'data/shakespeare/train.txt'
     ])
-
-    class Args():
-        def __init__(self, **kwargs): 
-            for key in kwargs: setattr(self, key, kwargs[key])
 
     args = Args(
         tokenizer = tokenizer,

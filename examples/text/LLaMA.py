@@ -1,14 +1,11 @@
 import aka.nn as nn
 import aka.numpy as np
 import aka.repo as repo
+from aka.nn import Args
 
 def LLaMA(name):
     tokenizer = repo.AutoTokenizer(name)
     cfg = repo.fopen(name, 'config.json', ftype='json')
-    class Args():
-        def __init__(self, **kwargs): 
-            for key in kwargs:
-                setattr(self, key, kwargs[key])
 
     # -- TODO Check it --
     args = Args(

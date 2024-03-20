@@ -6,10 +6,7 @@ os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 import aka.nn as nn
 import aka.repo as repo
 import aka.data
-
-class Args():
-    def __init__(self, **kwargs): 
-        for key in kwargs: setattr(self, key, kwargs[key])
+from aka.nn import Args
 
 def TrainArena(names, train_args):
     # -- Tokenizer --
@@ -32,12 +29,9 @@ def TrainArena(names, train_args):
         role.persist_filename = 'data/RomeArena/'+role.name+".ckt"
 
     # -- Data loader
-    dataset = repo.AutoDataset('text', data_files=[
-        'data/wiki/wiki.txt',
-        'data/shakespeare/train.txt'
-    ])
+    dataset = repo.AutoDataset('text', data_dir='data/text', split='train')
     dataloader = aka.data.StreamingLoader(
-                    dataset['train'], 
+                    dataset, 
                     tokenizer=tokenizer, 
                     n_tokens=512,
                     batch_size=6,

@@ -10,18 +10,18 @@ def join(*args, _raise_exceptions_for_missing_entries=True, **kwargs):
     import transformers
     return transformers.utils.cached_file(*args, _raise_exceptions_for_missing_entries=_raise_exceptions_for_missing_entries, **kwargs)
 
-def fopen(repo, pathname, ftype='file', framework=aka.numpy.framework(), **kwargs):
+def fopen(repo, pathname, ftype='file', open_kwargs={}, framework=aka.numpy.framework(), **kwargs):
     match ftype:
         case 'json':
             import json
-            return json.load(open(join(repo, pathname, **kwargs)))
+            return json.load(open(join(repo, pathname, **kwargs), **open_kwargs))
 
         case 'safetensor':
             import safetensors
-            return safetensors.safe_open(join(repo, pathname, **kwargs), framework=framework)
+            return safetensors.safe_open(join(repo, pathname, **kwargs), framework=framework, **open_kwargs)
             
         case 'file':
-            return open(join(repo, pathname, **kwargs))
+            return open(join(repo, pathname, **kwargs), **open_kwargs)
 
 def AutoDataset(*args, **kwargs):
     import datasets

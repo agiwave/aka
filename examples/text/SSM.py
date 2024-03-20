@@ -1,6 +1,7 @@
 
 import aka.nn as nn
 import aka.numpy as np
+from aka.nn import Args
 
 def SSMBlock(args):
     '''
@@ -69,10 +70,6 @@ def SSMBlock(args):
             outputs = y if outputs is None else np.cat([outputs, y], dim=1)
         return self.resid_dropout(self.out_proj(outputs))
     return __init__(nn.Module(forward=forward), args)
-
-class Args():
-    def __init__(self, **kwargs): 
-        for key in kwargs: setattr(self, key, kwargs[key])
 
 def SSMArgs(name):
     args = Args(

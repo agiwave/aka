@@ -1,5 +1,6 @@
 import aka.nn as nn
 import aka.numpy as np
+from aka.nn import Args
 
 def RetentionBlock(args):
     def __init__(self,args):
@@ -210,10 +211,6 @@ def RetentionBlock(args):
         return self.out_proj(out)
 
     return __init__(nn.Module(forward=forward,recurrent_retention=recurrent_retention), args)
-
-class Args():
-    def __init__(self, **kwargs): 
-        for key in kwargs: setattr(self, key, kwargs[key])
 
 def RetentionArgs(name):
     args = Args(

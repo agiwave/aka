@@ -1,5 +1,6 @@
 import aka.nn as nn
 import aka.numpy as np
+from aka.nn import Args
 
 def PredictionBlock(args):
     '''
@@ -54,11 +55,6 @@ def PredictionBlock(args):
             return y
 
     return __init__(nn.Module(forward=forward), args)
-
-
-class Args():
-    def __init__(self, **kwargs): 
-        for key in kwargs: setattr(self, key, kwargs[key])
 
 def PredictionArgs(name):
     class Tokenizer:

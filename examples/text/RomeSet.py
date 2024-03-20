@@ -1,15 +1,12 @@
 import aka.nn as nn
 import aka.numpy as np
-
-class Args():
-    def __init__(self, **kwargs): 
-        for key in kwargs: setattr(self, key, kwargs[key])
+from aka.nn import Args
 
 def RomeSetArgs(name):
     class Tokenizer:
         def __init__(self, path):
             from sentencepiece import SentencePieceProcessor
-            self.tokenizer = SentencePieceProcessor('data/Gemma/tokenizer.model')
+            self.tokenizer = SentencePieceProcessor(path)
             self.bos_token_id = self.tokenizer.bos_id()
             self.eos_token_id = self.tokenizer.eos_id()
         def encode(self, s):

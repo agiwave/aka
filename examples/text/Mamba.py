@@ -1,11 +1,8 @@
 import aka.nn as nn
 import aka.numpy as np
+from aka.nn import Args
 
 def MambaArgs(name):
-    class Args():
-        def __init__(self, **kwargs): 
-            for key in kwargs:
-                setattr(self, key, kwargs[key])
     args = Args(
         mamba_args = Args(
             conv_kernel_size = 4,
@@ -133,11 +130,6 @@ def MambaBlock(args):
 
 def Mamba(name):
     import aka.repo as repo
-
-    class Args():
-        def __init__(self, **kwargs): 
-            for key in kwargs:
-                setattr(self, key, kwargs[key])
                 
     # -- Tokenizer --
     tokenizer = repo.AutoTokenizer(name)

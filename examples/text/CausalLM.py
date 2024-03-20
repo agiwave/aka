@@ -1,6 +1,7 @@
 import math
 import aka.nn as nn
 import aka.numpy as np
+from aka.nn import Args
 
 def MetaLayer(name, args):
     '''
@@ -187,10 +188,6 @@ if __name__ == "__main__":
         def __iter__(self):
             return iter(self.batchs)
             
-    class Args():
-        def __init__(self, **kwargs): 
-            for key in kwargs: setattr(self, key, kwargs[key])
-
     def train(persist_filename=None, **kwargs):
         args = Args(
             tokenizer = tokenizer,

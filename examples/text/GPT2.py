@@ -5,6 +5,7 @@ import aka.nn as nn
 import aka.numpy as np
 import aka.repo as repo
 import aka.data
+from aka.nn import Args
 from CausalLM import CausalLM
 
 if __name__ == "__main__":
@@ -14,10 +15,6 @@ if __name__ == "__main__":
         'data/wiki/wiki.txt',
         'data/shakespeare/train.txt'
     ])
-
-    class Args():
-        def __init__(self, **kwargs): 
-            for key in kwargs: setattr(self, key, kwargs[key])
 
     args = Args(
         tokenizer = tokenizer,

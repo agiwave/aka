@@ -1,5 +1,6 @@
 import aka.nn as nn
 import aka.numpy as np
+from aka.nn import Args
 
 def GemmaEmbNorm():
     def forward(self, x):
@@ -19,10 +20,6 @@ def GemmaArgs(name):
             return self.tokenizer.encode(s)
         def decode(self, s):
             return self.tokenizer.decode(s)
-
-    class Args():
-        def __init__(self, **kwargs): 
-            for key in kwargs: setattr(self, key, kwargs[key])
 
     args = Args(
         tokenizer = Tokenizer('data/Gemma/tokenizer.model'),

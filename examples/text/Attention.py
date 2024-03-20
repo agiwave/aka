@@ -1,5 +1,6 @@
 import aka.nn as nn
 import aka.numpy as np
+from aka.nn import Args
 
 try:
     from xformers.ops.fmha import memory_efficient_attention
@@ -158,9 +159,6 @@ def AttentionBlock(args):
 
 # --- Example ---
 if __name__ == "__main__":
-    class Args():
-        def __init__(self, **kwargs): 
-            for key in kwargs: setattr(self, key, kwargs[key])
     atten = AttentionBlock(Args(
         latent_dim = 384,
         attn_args = Args(
