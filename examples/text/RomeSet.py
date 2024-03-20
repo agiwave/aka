@@ -70,4 +70,4 @@ if __name__ == "__main__":
         # 'RomeSet-AFT15m',
         # 'RomeSet-Ret15m',
         # 'RomeSet-Gemma15mNOV',
-    ], Args(lr = 6e-4, epochs=3))
+    ], Args(lr = 6e-4, epochs=1))

@@ -1,17 +1,6 @@
+import math
 import aka.nn as nn
 import aka.numpy as np
-
-def RMSNorm(dim: int, eps: float = 1e-5):
-    '''
-    Reference: LLaMA and Gemma
-    '''
-    def forward(self, x):
-        x = (x.float() * np.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)).type_as(x)
-        return x * self.weight
-    return nn.Module(
-        forward = forward,
-        eps = eps,
-        weight = nn.Parameter(np.ones(dim)))
 
 def MetaLayer(name, args):
     '''
@@ -24,21 +13,19 @@ def MetaLayer(name, args):
             y, loss = y
             return x+y, loss
         else:
-            return x+y
+            return x+y, None
 
     import importlib
     module = importlib.import_module(name)
     short_name = name.split('./\\')[-1]
     m = getattr(module, short_name+"Block", None)
     assert m is not None, f"Unknown layer:{name}"
-    return nn.Module(forward = forward,norm = RMSNorm(args.latent_dim),layer = m(args))
+    return nn.Module(forward = forward,norm = nn.RMSNorm(args.latent_dim),layer = m(args))
 
-import math
 def CausalLM(args):
     '''
     Causal Language Model.
     '''
-
     def __init__(self, args):
         in_proj, out_proj = None, None
         vocab_dim = getattr(args, 'vocab_dim', args.latent_dim)
@@ -57,7 +44,7 @@ def CausalLM(args):
                     from Gemma import GemmaEmbNorm
                     prev_norm = GemmaEmbNorm()
                 case _:
-                    prev_norm = RMSNorm(args.latent_dim)
+                    prev_norm = nn.RMSNorm(args.latent_dim)
 
         embedding_scale = getattr(args,'embedding_scale',False)
         self.tokenizer = args.tokenizer
@@ -71,7 +58,7 @@ def CausalLM(args):
         self.out_proj = out_proj
         self.lm_head = None if not lm_head else nn.Linear(vocab_dim, args.vocab_size,bias=False)
         self.prev_norm = prev_norm
-        self.post_norm = RMSNorm(args.latent_dim)
+        self.post_norm = nn.RMSNorm(args.latent_dim)
         self.gctx = {}
         return self
 
@@ -85,7 +72,7 @@ def CausalLM(args):
                 x = np.pad(x, (self.latent_dim-self.vocab_dim,0), mode='constant', value=float(0.0))
             else:
                 x = self.in_proj(x)
-        if self.embedding_scale is not None:
+        if self.embedding_scale is not None:    # RetNet, nonsense :(. 
             x = x * self.embedding_scale
 
         # -- layers --
@@ -101,11 +88,9 @@ def CausalLM(args):
         layer_losses = []
         for i in range(len(self.layers)):
             l_state = None if state is None else layer_states[i]
-            x = self.layers[i](x, targets=targets, gctx=gctx, state=l_state)
-            if isinstance(x, tuple):
-                (x, loss) = x
-                if loss is not None:
-                    layer_losses.append(loss)
+            x, loss = self.layers[i](x, targets=targets, gctx=gctx, state=l_state)
+            if loss is not None:
+                layer_losses.append(loss)
 
         if self.post_norm is not None:
             x = self.post_norm(x)
@@ -156,24 +141,6 @@ def CausalLM(args):
                 if cache[-1] == word_token_ids[-1]:
                     cache = []
                     yield word
-
-            # if len(prompt_tokens) > 1:
-            #     self(np.array([prompt_tokens[:-1]]), state=state)
-            # input_token_ids = np.array([prompt_tokens])
-            # for _ in range(max_length):
-            #     outputs = self(input_token_ids, state=state)
-            #     output_token_ids = np.argmax(outputs[:,-1:,:], dim=-1)
-            #     cache = cache + output_token_ids[0].tolist()
-            #     if self.tokenizer.eos_token_id in input_token_ids:
-            #         break
-
-            #     word = self.tokenizer.decode(cache)
-            #     word_token_ids = self.tokenizer.encode(word)
-            #     if cache == word_token_ids:
-            #         cache = []
-            #         yield word
-
-            #     input_token_ids = np.cat([input_token_ids, output_token_ids], dim=1)
 
             if len(cache)>0:
                 yield self.tokenizer.decode(cache)
@@ -290,3 +257,23 @@ if __name__ == "__main__":
     plt.ylabel('Losses')
     plt.legend([k for k in trains], loc='upper right')
     plt.show()
+
+
+
+# if len(prompt_tokens) > 1:
+#     self(np.array([prompt_tokens[:-1]]), state=state)
+# input_token_ids = np.array([prompt_tokens])
+# for _ in range(max_length):
+#     outputs = self(input_token_ids, state=state)
+#     output_token_ids = np.argmax(outputs[:,-1:,:], dim=-1)
+#     cache = cache + output_token_ids[0].tolist()
+#     if self.tokenizer.eos_token_id in input_token_ids:
+#         break
+
+#     word = self.tokenizer.decode(cache)
+#     word_token_ids = self.tokenizer.encode(word)
+#     if cache == word_token_ids:
+#         cache = []
+#         yield word
+
+#     input_token_ids = np.cat([input_token_ids, output_token_ids], dim=1)

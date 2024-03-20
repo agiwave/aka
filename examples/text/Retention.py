@@ -2,18 +2,6 @@ import aka.nn as nn
 import aka.numpy as np
 
 def RetentionBlock(args):
-    def RMSNorm(dim: int, eps: float = 1e-5):
-        '''
-        Reference: LLaMA and Gemma
-        '''
-        def forward(self, x):
-            x = (x.float() * np.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)).type_as(x)
-            return x * self.weight
-        return nn.Module(
-            forward = forward,
-            eps = eps,
-            weight = nn.Parameter(np.ones(dim)))
-
     def __init__(self,args):
         # config: RetNetConfig,
         gate_fn="swish"
@@ -34,7 +22,7 @@ def RetentionBlock(args):
         self.v_proj = nn.Linear(self.embed_dim, self.value_dim, bias=use_bias)
         self.g_proj = nn.Linear(self.embed_dim, self.value_dim, bias=use_bias)
         self.out_proj = nn.Linear(self.value_dim, self.embed_dim, bias=use_bias)
-        self.group_norm = RMSNorm(self.head_dim)
+        self.group_norm = nn.RMSNorm(self.head_dim)
         if tensor_parallel:
             self.decay_proj = nn.Linear(self.num_heads, self.num_heads, bias=False)
         else:
