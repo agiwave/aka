@@ -1,6 +1,6 @@
 from .. import boot
 
-def exists(repo, pathname, **kwargs): return boot.invoke()
+def exist(repo, pathname, **kwargs): return boot.invoke()
 def fopen(repo, pathname, ftype, **kwargs): return boot.invoke()
 
 def AutoModel(repo): return boot.invoke()

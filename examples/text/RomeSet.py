@@ -47,6 +47,9 @@ def RomeSetArgs(name):
         case 'Gemma15mNOV':
             args.layers = ['Attention', 'MLP']*12
             args.vocab_dim = args.latent_dim
+        case 'Gemma15mTopk':
+            args.layers = ['Attention', 'MLP']*12     
+            args.mlp_args.activation = 'topk'
         case '20m':
             args.layers = ['Attention', 'MLP']*15
         case '70m':
@@ -62,8 +65,9 @@ def RomeSetArgs(name):
 if __name__ == "__main__":
     from RomeArena import TrainArena
     TrainArena([
+        'RomeSet-Gemma15mTopk',
         'RomeSet-Gemma15m',
-        'RomeSet-AFT15m',
-        'RomeSet-Ret15m',
-        'RomeSet-Gemma15mNOV',
+        # 'RomeSet-AFT15m',
+        # 'RomeSet-Ret15m',
+        # 'RomeSet-Gemma15mNOV',
     ], Args(lr = 6e-4, epochs=3))

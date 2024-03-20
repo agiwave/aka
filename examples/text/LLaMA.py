@@ -35,7 +35,7 @@ def LLaMA(name):
 
     from CausalLM import CausalLM
     llama = CausalLM(args)
-    if os.path.exists(name+"/model.safetensors"):
+    if os.path.exist(name+"/model.safetensors"):
         def copy(desc, src):
             if not (desc.shape == src.shape):
                 print("Unmatch shape was found.", desc.shape, src.shape)

@@ -1,6 +1,16 @@
 import aka.nn as nn
 import aka.numpy as np
 
+def Topk(n_topk, *, dim=-1):
+    def forward(self, x):
+        dim = self.dim
+        n_topk = self.n_topk
+        v, indics = np.topk(x, n_topk, dim=dim)
+        v = np.select(v, dim=dim, index=n_topk-1).unsqueeze(dim=dim)
+        x = np.where(x<v,float('-inf'), x)
+        return np.softmax(x, dim=dim)
+    return nn.Module(forward=forward, n_topk=n_topk, dim=dim)
+
 def MLPBlock(args):
     '''
     Reference: Gemma, LLaMA
@@ -34,7 +44,11 @@ def MLPBlock(args):
         qk_dim = getattr(args, 'qk_dim', latent_dim)
         hidden_dim = getattr(args, 'hidden_dim', latent_dim)
         act = getattr(args, 'activation', 'gelu')
-        self.act = getattr(np, 'act')
+        match act:
+            case 'topk':
+                self.act = Topk(*getattr(args, 'activation_args', [3]))
+            case _:
+                self.act = getattr(np, act)
         self.in_proj = None if qk_dim == latent_dim else nn.Linear(latent_dim, qk_dim, bias=bias)   # Q
         self.up_proj = nn.Linear(qk_dim, kv_size, bias=bias)                                        # K(reversed)
         self.gate_proj = None if not kv_gate else nn.Linear(qk_dim, kv_size, bias=bias)             # G or mask
