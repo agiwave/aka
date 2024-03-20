@@ -154,107 +154,41 @@ def CausalLM(args):
         
     return __init__(nn.Module(forward = forward, generate = generate, generator=generator),args)
 
-if __name__ == "__main__":
-    # encode with tiktoken gpt2 bpe
-    from transformers import AutoTokenizer
-    tokenizer = AutoTokenizer.from_pretrained('data/mamba-370m-hf')
-    class DataLoader:
-        def __init__(self, data_dir: str, block_size: int = 1024, filemode: str = "r", batch_size=12) -> None:
+def CausalLMArgs(name):
+    args = Args(
+        vocab_size = 50304,
+        vocab_dim = 64,
+        block_size = 256,
+        latent_dim = 384,
+        dropout = 0.2,
+        bias = False, # do we use bias inside LayerNorm and Linear layers?
 
-            with open(data_dir, 'r', encoding='utf-8') as f:
-                data = f.read()
-
-            train_ids = tokenizer.encode(data)
-            print(f"train has {len(train_ids):,} tokens")
-
-            batch_length = len(train_ids) // batch_size
-            batchs = [
-                (
-                    np.cat([
-                        np.array(train_ids[
-                            i_row*batch_length+i_col*block_size : i_row*batch_length+(i_col+1)*block_size
-                        ]).unsqueeze(0)
-                        for i_row in range(batch_size)]
-                    ),
-                    [True for _ in range(batch_size)]
-                )
-                for i_col in range(batch_length // block_size)
-            ]
-            self.batchs = batchs
-
-        def __len__(self) -> int:
-            return len(self.batchs)
-
-        def __iter__(self):
-            return iter(self.batchs)
-            
-    def train(persist_filename=None, **kwargs):
-        args = Args(
-            tokenizer = tokenizer,
-            vocab_size = 50304,
-            vocab_dim = 64,
-            block_size = 256,
-            latent_dim = 384,
-            dropout = 0.2,
-            bias = False, # do we use bias inside LayerNorm and Linear layers?
-
-            layers = ['Attention', 'MLP']*6,
-            mlp_args = Args(
-                kv_size = 384*4,
-                kv_gate = True,
-                qk_dim = 384,
-                hidden_dim = 384
-            ),
-            attn_args = Args(
-                size = 256,
-                qk_dim = 384,
-                hidden_dim = 384,
-                num_heads = 6,
-                num_kv_groups = 6,
-                rotary_embedding = True,
-            ),
-            mamba_args = Args(
-                hidden_dim = 160,
-                dt_rank = 24, # args.latent_dim // 16
-                conv_kernel_size = 4,
-                conv_bias = True,
-                d_state = 16
-            ),
-
-            # -- Train args --
-            lr = 6e-4, # max learning rate
-            dataset_path='./data/shakespeare.txt',
-            batch_size = 24,
-            epochs=1
+        layers = ['Attention', 'MLP']*6,
+        mlp_args = Args(
+            kv_size = 384*4,
+            kv_gate = True,
+            qk_dim = 384,
+            hidden_dim = 384
+        ),
+        attn_args = Args(
+            size = 256,
+            qk_dim = 384,
+            hidden_dim = 384,
+            num_heads = 6,
+            num_kv_groups = 6,
+            rotary_embedding = True,
         )
-        for k, v in kwargs.items():
-            setattr(args, k, v)
-        return nn.train(
-            CausalLM(args), 
-            data_loader=DataLoader(args.dataset_path, block_size=args.block_size//2, batch_size=args.batch_size),
-            optimizer="Adam",
-            optimizer_kwargs={'lr':args.lr},
-            forward_kwargs={'state':{}},
-            persist_filename = persist_filename,
-            epochs=args.epochs)
+    )
+    return args
 
-    trains = {
-        'att' : train(layers=['Attention', 'MLP']*6, vocab_dim=64),
-        'attv' : train(layers=['Attention', 'MLP']*6, vocab_dim=384),
-        # 'att' : train(layers=['Attention', 'MLP']*6,),
-        # 'catt' : train(layers=['Attention', 'MLP']*6),
-        # 'attg' : train(layers=['Attention', 'MLP']*6, mlp_gate=True),
-        # 'cattg' : train(layers=['Attention', 'MLP']*6, mlp_gate=True)
-    }
-
-    from matplotlib import pyplot as plt
-    for _, v in trains.items():
-        plt.plot(v)
-    plt.xlabel('Iterators')
-    plt.ylabel('Losses')
-    plt.legend([k for k in trains], loc='upper right')
-    plt.show()
-
+if __name__ == "__main__":
+    from RomeArena import TrainArena, RunArena
+    TrainArena([
+        'CausalLM-demo'
+    ], Args(lr = 6e-4, epochs=3))
+    # RunArena([
+    #     'CausalLM-demo'
+    # ], "Paul Daniels (born 4 June 1981 in Burlington)")
 
 
 # if len(prompt_tokens) > 1:
