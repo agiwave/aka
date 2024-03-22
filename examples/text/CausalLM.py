@@ -138,6 +138,12 @@ def CausalLM(args):
         with np.no_grad():
             state = {}
             cache = []
+
+            # One by One
+            # for i in range(len(prompt_tokens)-1):
+            #     self(np.array([prompt_tokens[i:i+1]]), state=state)
+            # input_token_ids = np.array([prompt_tokens[-1:]])
+
             input_token_ids = np.array([prompt_tokens])
             for _ in range(max_length):
                 outputs = self(input_token_ids, state=state)
@@ -151,6 +157,26 @@ def CausalLM(args):
                 if cache[-1] == word_token_ids[-1]:
                     cache = []
                     yield word
+
+            # Without state
+            # if len(prompt_tokens) > 1:
+            #     self(np.array([prompt_tokens[:-1]]))
+            # input_token_ids = np.array([prompt_tokens])
+            # for _ in range(max_length):
+            #     outputs = self(input_token_ids)
+            #     output_token_ids = np.argmax(outputs[:,-1:,:], dim=-1)
+            #     cache = cache + output_token_ids[0].tolist()
+            #     if self.tokenizer.eos_token_id in input_token_ids:
+            #         break
+
+            #     word = self.tokenizer.decode(cache)
+            #     word_token_ids = self.tokenizer.encode(word)
+            #     if cache == word_token_ids:
+            #         cache = []
+            #         yield word
+
+            #     input_token_ids = np.cat([input_token_ids, output_token_ids], dim=1)
+
 
             if len(cache)>0:
                 yield self.tokenizer.decode(cache)

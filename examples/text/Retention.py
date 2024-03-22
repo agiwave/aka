@@ -13,6 +13,7 @@ def RetentionBlock(args):
         self.key_dim = self.embed_dim // self.num_heads
         self.scaling = self.key_dim**-0.5
         self.gate_fn = np.silu
+        self.window_size = None
 
         self.q_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=use_bias)
         self.k_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=use_bias)
@@ -30,9 +31,9 @@ def RetentionBlock(args):
             retention_info = (decay.view(1, -1, 1, 1).exp(), None, None)
         else:
             index = np.arange(klen).to(decay)
-            mask = np.tril(np.ones(qlen, klen)).to(decay)
+            mask = np.tril(np.ones(qlen, klen), diagonal=klen-qlen).to(decay)
             mask = np.masked_fill(
-                index[:, None] - index[None, :], ~mask.bool(), float("inf")
+                index[-qlen:, None] - index[None, :], ~mask.bool(), float("inf")
             )
             # Hard to believe it, Diff decay for diff heads?
             mask = np.exp(mask * decay[:, None, None])
@@ -122,12 +123,22 @@ def RetentionBlock(args):
         q, k, v = [t.view(B, T, self.num_heads, -1) for t in [q,k,v]]
         k *= self.scaling
 
+        # -- append kv cache --
+        mode = 'parallel' if T > 1 else 'recurrent'
+        # mode = 'parallel'
+        # if state is not None:
+        #     window_size = self.window_size if self.window_size is not None else 128
+        #     if 'cache_kv2' in state:
+        #         cache_k, cache_v = state['cache_kv2']
+        #         k = np.cat((cache_k, k), dim=1)
+        #         v = np.cat((cache_v, v), dim=1)
+        #     state['cache_kv2'] = (k[:,1-window_size:].detach(), v[:,1-window_size:].detach())
+
         # -- rotary embedding --
         q, k, v = [np.einsum('blnd->bnld', t) for t in [q, k, v]]
-        q = apply_rotary_emb(q, gctx)
+        q = apply_rotary_emb(q, gctx, pos=k.size(2)-T)
         k = apply_rotary_emb(k, gctx)
 
-        mode = 'parallel' if T > 1 else 'recurrent'
         if state is not None:
             mask = state.get(mode, None)
             if mask is None or mask[0].size(2) != q.size(2) or mask[0].size(3) != k.size(2):
@@ -140,7 +151,7 @@ def RetentionBlock(args):
         # -- Cache load --
         kv_cache = None if state is None else state.get('kv_cache', None)
 
-        if T>1:
+        if mode == 'parallel':
             # retention(q,k,v)
             retention = np.einsum('bnld,bnmd->bnlm', q, k)
             retention = retention * decay_mask 
@@ -150,6 +161,8 @@ def RetentionBlock(args):
             retention_out = np.einsum('bnlm,bnmd->blnd', retention, v)
 
             # kv cache: [b, h, t, v_dim, qk_dim]
+            # What's this? :) This could not be S(n) = gamma * S(n-1) + K(n) @ V(n)
+            # This is just a approximation.
             current_kv = k.unsqueeze(-2) * v.unsqueeze(-1)
             intra_decay = intra_decay[:, :, :, None, None]  # [b, h, t, 1, 1]
             current_kv = (current_kv * intra_decay).sum(2)  # [b, h, v_dim, qk_dim]
@@ -157,8 +170,7 @@ def RetentionBlock(args):
         else:
             retention_out, kv_cache = self.recurrent_retention(q,k,v,
                 decay_mask,
-                kv_cache=kv_cache,
-                retention_mask=None #??????
+                kv_cache=kv_cache
             )
 
         # -- Cache save --
