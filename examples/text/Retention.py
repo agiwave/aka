@@ -4,10 +4,7 @@ from aka.nn import Args
 
 def RetentionBlock(args):
     def __init__(self,args):
-        # config: RetNetConfig,
-        gate_fn="swish"
         use_bias=args.bias
-        tensor_parallel=False
         self.config = args.attn_args
         self.embed_dim = args.latent_dim
         self.value_dim = getattr(args.attn_args, 'hidden_dim', args.latent_dim)
@@ -15,8 +12,7 @@ def RetentionBlock(args):
         self.head_dim = self.value_dim // self.num_heads
         self.key_dim = self.embed_dim // self.num_heads
         self.scaling = self.key_dim**-0.5
-        self.rot_embedding = getattr(args.attn_args, 'rotary_embedding', False),
-        self.gate_fn = getattr(np, gate_fn)
+        self.gate_fn = np.silu
 
         self.q_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=use_bias)
         self.k_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=use_bias)
@@ -24,29 +20,19 @@ def RetentionBlock(args):
         self.g_proj = nn.Linear(self.embed_dim, self.value_dim, bias=use_bias)
         self.out_proj = nn.Linear(self.value_dim, self.embed_dim, bias=use_bias)
         self.group_norm = nn.RMSNorm(self.head_dim)
-        if tensor_parallel:
-            self.decay_proj = nn.Linear(self.num_heads, self.num_heads, bias=False)
-        else:
-            self.decay_proj = None
         return self
 
-    def compute_mask(slen, latent_dim, num_heads, get_decay_scale=True, retention_mask=None, mode='parallel'):
-        angle = 1.0 / (
-            10000 ** np.linspace(0, 1, latent_dim // num_heads // 2)
-        )
-        angle = angle.unsqueeze(-1).repeat(1, 2).flatten()
+    def compute_mask(qlen, klen, latent_dim, num_heads, get_decay_scale=True, retention_mask=None, mode='parallel'):
         decay = np.log(
             1 - 2 ** (-5 - np.arange(num_heads, dtype=np.float))
         )
         if mode == "recurrent":
-            sin = np.sin(angle * (slen - 1))
-            cos = np.cos(angle * (slen - 1))
-            retention_rel_pos = (decay.view(1, -1, 1, 1).exp(), None, None)
+            retention_info = (decay.view(1, -1, 1, 1).exp(), None, None)
         else:
-            index = np.arange(slen).to(decay)
-            sin = np.sin(index[:, None] * angle[None, :])
-            cos = np.cos(index[:, None] * angle[None, :])
-            mask = np.tril(np.ones(slen, slen)).to(decay)
+            # mask = np.tril(np.ones(qlen, klen)).to(decay)
+            # mask = np.where(mask <= 0.5, float("inf"), mask)
+            index = np.arange(klen).to(decay)
+            mask = np.tril(np.ones(klen, klen)).to(decay)
             mask = np.masked_fill(
                 index[:, None] - index[None, :], ~mask.bool(), float("inf")
             )
@@ -60,7 +46,7 @@ def RetentionBlock(args):
 
             # decay_scale (used for kv cache)
             if get_decay_scale:
-                exponent = np.arange(slen, device=decay.device).float()
+                exponent = np.arange(klen, device=decay.device).float()
                 decay_scale = decay.exp().view(-1, 1) ** exponent.view(1, -1)  # [h, t]
                 if retention_mask is not None:
                     seqlen = retention_mask.sum(dim=-1)  # [b,]
@@ -75,19 +61,11 @@ def RetentionBlock(args):
                 decay_scale = None
 
             # mask processing for intra decay
-            if retention_mask is not None:
-                max_non_zero = (
-                    np.cumsum(retention_mask, dim=-1).max(dim=-1).indices
-                )  # [b,]
-                intra_decay = mask[range(mask.shape[0]), :, max_non_zero]
-            else:
-                intra_decay = mask[:, :, -1]
-            retention_rel_pos = (mask, intra_decay, decay_scale)
-        return (cos,sin),retention_rel_pos
+            intra_decay = mask[:, :, -1]
+            retention_info = (mask, intra_decay, decay_scale)
+        return retention_info
 
-    def recurrent_retention(
-        self, q, k, v, decay, kv_cache=None, retention_mask=None
-    ):
+    def recurrent_retention(self, q, k, v, decay, kv_cache=None, retention_mask=None):
         """
         q, k, v, # bsz * num_head * 1 * qkv_dim
         kv_cache:
@@ -129,49 +107,63 @@ def RetentionBlock(args):
         output = np.sum(q * current_kv, dim=3).unsqueeze(1)  # (b, 1, h, d_v)
         return output, {"prev_key_value": current_kv, "scale": scale}
 
-    def theta_shift(x, sin, cos):
+    def apply_rotary_emb(x, cache, pos=0):
+        _,_,L,D = x.shape
+        slen = pos+L
+        emb = cache.get('rotary_emb', None)
+        if emb is None or len(emb[0]) < slen:
+            angle = 1.0 / (10000 ** np.linspace(0, 1, D//2))
+            angle = angle.unsqueeze(-1).repeat(1, 2).flatten()
+            index = np.arange(slen)
+            sin = np.sin(index[:, None] * angle[None, :])
+            cos = np.cos(index[:, None] * angle[None, :])
+            cache['rotary_emb'] = (sin, cos)
+        else:
+            (sin,cos) = emb
         x1 = x[:, :, :, ::2]
         x2 = x[:, :, :, 1::2]
         y = np.stack((-x2, x1), dim=-1).flatten(-2)
-        return (x * cos) + (y * sin)
+        return (x * cos[pos:pos+L]) + (y * sin[pos:pos+L])
 
-    def forward(
-        self,
-        hidden_states,
-        gctx = {},
-        state = None,
-        **kwargs
-    ): 
+    def forward(self, hidden_states, gctx = {}, state = None, **kwargs): 
         B, T, H = hidden_states.size()
+        q, k, v, g = [proj(hidden_states) for proj in [self.q_proj, self.k_proj, self.v_proj, self.g_proj]]
+        q, k, v = [t.view(B, T, self.num_heads, -1) for t in [q,k,v]]
+        k *= self.scaling
+
+        # -- append kv cache --
+        # if state is not None:
+        #     window_size = 128
+        #     if 'kv_cache' in state:
+        #         k_cache, v_cache = state['kv_cache']
+        #         if k_cache.size(1) >= window_size:  # Never happen here.
+        #             k = np.cat((k_cache[:,1-window_size:,:], k), dim=1)
+        #             v = np.cat((v_cache[:,1-window_size:,:], v), dim=1)
+        #         else:
+        #             k = np.cat((k_cache, k), dim=1)
+        #             v = np.cat((v_cache, v), dim=1)
+        #         T = k.size(1)
+        #     state['kv_cache'] = (k[:,1-window_size:].detach(), v[:,1-window_size:].detach())
+
+        # -- rotary embedding --
+        q, k, v = [np.einsum('blnd->bnld', t) for t in [q, k, v]]
+        q = apply_rotary_emb(q, gctx)
+        k = apply_rotary_emb(k, gctx)
 
         mode = 'parallel' if T > 1 else 'recurrent'
         if state is not None:
             mask = state.get(mode, None)
-            if mask is not None:
-                ((cos,_),_) = mask
-                if cos.size(0) != T:
-                    mask = None
-            if mask is None:
-                mask = compute_mask(T, self.embed_dim, self.num_heads, mode=mode)
+            if mask is None or mask[0].size(2) != q.size(2) or mask[0].size(3) != k.size(2):
+                mask = compute_mask(q.size(2), k.size(2), self.embed_dim, self.num_heads, mode=mode)
                 state[mode] = mask
         else:
-            mask = compute_mask(T, self.embed_dim, self.num_heads, mode=mode)
-        ((cos, sin), (decay_mask, intra_decay, scale)) = mask
-
-        q, k, v, g = [proj(hidden_states) for proj in [self.q_proj, self.k_proj, self.v_proj, self.g_proj]]
-        q, k, v = [t.view(B, T, self.num_heads, -1) for t in [q,k,v]]
-        k *= self.scaling
-        q, k, v = [np.einsum('blnd->bnld', t) for t in [q, k, v]]
-        q = theta_shift(q, sin, cos)
-        k = theta_shift(k, sin, cos)
+            mask = compute_mask(q.size(2), k.size(2), self.embed_dim, self.num_heads, mode=mode)
+        (decay_mask, intra_decay, scale) = mask
 
         # -- Cache load --
         kv_cache = None if state is None else state.get('kv_cache', None)
 
-        if T > 1:
-            if self.decay_proj is not None:
-                decay_mask = self.decay_proj(decay_mask.transpose(-1, -3)).transpose(-3, -1)
-
+        if T>1:
             # retention(q,k,v)
             retention = np.einsum('bnld,bnmd->bnlm', q, k)
             retention = retention * decay_mask 
@@ -179,11 +171,6 @@ def RetentionBlock(args):
                 dim=-1, keepdim=True
             ).clamp(min=1, max=5e4)
             retention_out = np.einsum('bnlm,bnmd->blnd', retention, v)
-
-            if self.decay_proj is not None:
-                intra_decay = self.decay_proj(intra_decay.transpose(-1, -2)).transpose(
-                    -2, -1
-                )
 
             # kv cache: [b, h, t, v_dim, qk_dim]
             current_kv = k.unsqueeze(-2) * v.unsqueeze(-1)
@@ -202,7 +189,7 @@ def RetentionBlock(args):
             state['kv_cache'] = kv_cache
 
         # norm
-        normed = self.group_norm(retention_out).reshape(B, T, self.value_dim)
+        normed = self.group_norm(retention_out).reshape(B, hidden_states.size(1), self.value_dim)
         # out gate & proj
         out = self.gate_fn(g) * normed
         return self.out_proj(out)
@@ -291,7 +278,7 @@ def RetNet(name):
 if __name__ == "__main__":
     retnet = RetNet('data/SDPrompt-RetNet-300M')
     print('Model loaded')
-    for w in retnet.generator("<s>1girl"):
+    for w in retnet.generator("1girl"):
         print(w, end='')
 # <s> 1girl, absurdres, animal ear fluff, animal ears, bangs, bare shoulders, black hair, blue archive, blunt bangs, blush, closed mouth, collarbone, commentary request, eyes visible through hair, green eyes, hair between eyes, halo, hand on own face, hand up, highres, jacket, kisaki blue archive, long hair, long sleeves, looking at viewer, open clothes, open jacket, shinonome asu, simple background, solo, track jacket, upper body, white background, white jacket</s>
     # from RomeArena import TrainArena
