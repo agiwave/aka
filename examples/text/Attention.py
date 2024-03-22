@@ -53,44 +53,38 @@ def AttentionBlock(args):
         self.attn_v_dim = v_dim
         self.attn_heads = attn_heads
         self.attn_kv_groups = attn_kv_groups
-        self.scale_dk = 1.0/np.sqrt(np.array([attn_head_dim]))
+        self.scale_dk = attn_head_dim**-0.5
         self.rot_embedding = getattr(args, 'rotary_embedding', False)
         self.rope_theta = getattr(args, 'rope_theta', 10000)
         return self
 
-    # -- Reference: LLaMA and Gemma，--
-    def apply_rotary_emb(x, freqs_cis):
+    def apply_rotary_emb(x, cache, pos=0):
         '''
         Reference: LLaMA and Gemma
-        Applies the rotary embedding to the query and key tensors.
+        Applies the rotary embedding to the query and key.
         '''
         B,L,N,D = x.shape
+        slen = pos+L
+        freqs_cis = cache.get('freqs_cis', None)
+        if freqs_cis is None or len(freqs_cis) < slen:
+            """Precomputes the frequency cis."""
+            freqs = 1.0 / (10000**(np.arange(0, D, 2)[:(D // 2)].float() / D))
+            t = np.arange(slen, device=freqs.device)
+            freqs = np.outer(t, freqs).float()
+            freqs_cis = np.polar(np.ones_like(freqs), freqs)  # complex64
+            cache['freqs_cis'] = freqs_cis
+
         y = np.reshape(x, (B,L,N,2,D//2)).float()
         y = np.einsum('blncd->bnldc',y)
         y = np.view_as_complex(y.contiguous())
-        y = np.view_as_real(y*freqs_cis).type_as(x)
+        y = np.view_as_real(y*freqs_cis[pos:pos+L]).type_as(x)
         y = np.einsum('bnldc->blncd', y)
         return np.reshape(y, (B,L,N,D))
 
-    # -- Reference: LLaMA and Gemma， Could be learned automaticlly? --
-    def precompute_freqs_cis(dim: int,
-                            end: int,
-                            theta: float = 10000.0):
-        """Precomputes the frequency cis."""
-        freqs = 1.0 / (theta**(np.arange(0, dim, 2)[:(dim // 2)].float() / dim))
-        t = np.arange(end, device=freqs.device)
-        freqs = np.outer(t, freqs).float()
-        freqs_cis = np.polar(np.ones_like(freqs), freqs)  # complex64
-        return freqs_cis
-
     def causal_mask(shape, dtype, *, window_size = None, from_bottomright: bool = False,):
-        tensor = np.full(shape,dtype=dtype,fill_value=1)
-        num_queries, num_keys = shape[-2:]
-        shift = 0
-        if from_bottomright:
-            shift = num_keys - num_queries
-
-        mask = np.tril(tensor, diagonal=shift)
+        mask = np.full(shape,dtype=dtype,fill_value=1)
+        shift = 0 if not from_bottomright else shape[-1] - shape[-2] # q_len - k_len
+        mask = np.tril(mask, diagonal=shift)
         if window_size is not None:
             mask = np.triu(mask, diagonal=shift - window_size + 1)
         return np.log(mask)
@@ -99,45 +93,30 @@ def AttentionBlock(args):
         B, L, _ = x.size()
 
         # -- qkv --
-        attn_qk_dim, attn_heads, attn_kv_groups = self.attn_qk_dim, self.attn_heads, self.attn_kv_groups
-        attn_head_dim = attn_qk_dim // attn_heads
-        attn_k_dim, attn_v_dim = self.attn_k_dim, self.attn_v_dim
-        q, k, v  = self.in_proj(x).split([attn_qk_dim, attn_k_dim, attn_v_dim], dim=2)
+        attn_heads, attn_kv_groups = self.attn_heads, self.attn_kv_groups
+        q, k, v  = self.in_proj(x).split([self.attn_qk_dim, self.attn_k_dim, self.attn_v_dim], dim=2)
         q = q.view(B, L, attn_heads, -1)
         k = k.view(B, L, attn_kv_groups, -1)
         v = v.view(B, L, attn_kv_groups, -1)
 
-        # -- append state cache --
+        # -- append kv cache --
         if state is not None:
             window_size = self.window_size if self.window_size is not None else 128
-            if 'kv_cache' in state:
-                k_cache, v_cache = state['kv_cache']
-                if k_cache.size(1) >= window_size:  # Never happen here.
-                    k = np.cat((k_cache[:,1-window_size:,:], k), dim=1)
-                    v = np.cat((v_cache[:,1-window_size:,:], v), dim=1)
-                else:
-                    k = np.cat((k_cache, k), dim=1)
-                    v = np.cat((v_cache, v), dim=1)
-            state['kv_cache'] = (k[:,1-window_size:].detach(), v[:,1-window_size:].detach())
+            if 'cache_kv' in state:
+                cache_k, cache_v = state['cache_kv']
+                k = np.cat((cache_k, k), dim=1)
+                v = np.cat((cache_v, v), dim=1)
+            state['cache_kv'] = (k[:,1-window_size:].detach(), v[:,1-window_size:].detach())
 
         # -- rotary embedding --
         M = k.size(1)
         if self.rot_embedding:
-            if 'freqs_cis' in gctx:
-                freqs_cis = gctx['freqs_cis']
-                if freqs_cis.size(0) < M:
-                    freqs_cis = precompute_freqs_cis(attn_head_dim,M,theta=self.rope_theta)
-                    gctx['freqs_cis'] = freqs_cis
-            else:
-                freqs_cis = precompute_freqs_cis(attn_head_dim,M,theta=self.rope_theta)
-                gctx['freqs_cis'] = freqs_cis
+            q = apply_rotary_emb(q, gctx, M-L)
+            k = apply_rotary_emb(k, gctx)
 
-            q = apply_rotary_emb(q, freqs_cis=freqs_cis[M-L:M])
-            k = apply_rotary_emb(k, freqs_cis=freqs_cis[:M])
-
-        # -- repeat kv to q, MQA and GQA --
+        # -- repeat kv to match q, MQA and GQA --
         if attn_kv_groups != attn_heads:
-            # [B, L, N, head_dim]
+            # [B, L, N, D]
             k = np.repeat(k, attn_heads // attn_kv_groups, dim=2)
             v = np.repeat(v, attn_heads // attn_kv_groups, dim=2)
 
@@ -153,7 +132,7 @@ def AttentionBlock(args):
             att = np.softmax(att, dim=-1)
             att = self.attn_dropout(att)
             y = np.einsum('bnlm,bmnd->blnd', att, v)
-        y = y.reshape(B, L, self.hidden_dim) # re-assemble all head outputs side by side
+        y = y.reshape(B, L, self.hidden_dim)
         return self.resid_dropout(self.out_proj(y))
     return __init__(nn.Module(forward=forward), args)
 

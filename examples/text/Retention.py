@@ -22,20 +22,19 @@ def RetentionBlock(args):
         self.group_norm = nn.RMSNorm(self.head_dim)
         return self
 
-    def compute_mask(qlen, klen, latent_dim, num_heads, get_decay_scale=True, retention_mask=None, mode='parallel'):
+    def compute_mask(qlen, klen, latent_dim, num_heads, get_decay_scale=True, mode='parallel'):
         decay = np.log(
             1 - 2 ** (-5 - np.arange(num_heads, dtype=np.float))
         )
         if mode == "recurrent":
             retention_info = (decay.view(1, -1, 1, 1).exp(), None, None)
         else:
-            # mask = np.tril(np.ones(qlen, klen)).to(decay)
-            # mask = np.where(mask <= 0.5, float("inf"), mask)
             index = np.arange(klen).to(decay)
-            mask = np.tril(np.ones(klen, klen)).to(decay)
+            mask = np.tril(np.ones(qlen, klen)).to(decay)
             mask = np.masked_fill(
                 index[:, None] - index[None, :], ~mask.bool(), float("inf")
             )
+            # Hard to believe it, Diff decay for diff heads?
             mask = np.exp(mask * decay[:, None, None])
             mask = np.nan_to_num(mask)
             mask = mask.unsqueeze(0)  # [1, h, t, t]
@@ -48,15 +47,7 @@ def RetentionBlock(args):
             if get_decay_scale:
                 exponent = np.arange(klen, device=decay.device).float()
                 decay_scale = decay.exp().view(-1, 1) ** exponent.view(1, -1)  # [h, t]
-                if retention_mask is not None:
-                    seqlen = retention_mask.sum(dim=-1)  # [b,]
-                    bsz = seqlen.size(0)
-                    decay_scale = decay_scale.unsqueeze(0).repeat(bsz, 1, 1)  # [b, h, t]
-                    for i, pos in enumerate(seqlen):
-                        decay_scale[i, :, pos.item() :] = 0
-                else:
-                    bsz = 1
-                decay_scale = decay_scale.sum(-1).view(bsz, -1, 1, 1)  # [b, h, 1, 1]
+                decay_scale = decay_scale.sum(-1).view(1, -1, 1, 1)  # [b, h, 1, 1]
             else:
                 decay_scale = None
 
@@ -130,20 +121,6 @@ def RetentionBlock(args):
         q, k, v, g = [proj(hidden_states) for proj in [self.q_proj, self.k_proj, self.v_proj, self.g_proj]]
         q, k, v = [t.view(B, T, self.num_heads, -1) for t in [q,k,v]]
         k *= self.scaling
-
-        # -- append kv cache --
-        # if state is not None:
-        #     window_size = 128
-        #     if 'kv_cache' in state:
-        #         k_cache, v_cache = state['kv_cache']
-        #         if k_cache.size(1) >= window_size:  # Never happen here.
-        #             k = np.cat((k_cache[:,1-window_size:,:], k), dim=1)
-        #             v = np.cat((v_cache[:,1-window_size:,:], v), dim=1)
-        #         else:
-        #             k = np.cat((k_cache, k), dim=1)
-        #             v = np.cat((v_cache, v), dim=1)
-        #         T = k.size(1)
-        #     state['kv_cache'] = (k[:,1-window_size:].detach(), v[:,1-window_size:].detach())
 
         # -- rotary embedding --
         q, k, v = [np.einsum('blnd->bnld', t) for t in [q, k, v]]

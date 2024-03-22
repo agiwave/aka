@@ -3,25 +3,12 @@ import aka.numpy as np
 from aka.nn import Args
 
 def RomeSetArgs(name):
-    class Tokenizer:
-        def __init__(self, path):
-            from sentencepiece import SentencePieceProcessor
-            self.tokenizer = SentencePieceProcessor(path)
-            self.bos_token_id = self.tokenizer.bos_id()
-            self.eos_token_id = self.tokenizer.eos_id()
-        def encode(self, s):
-            return self.tokenizer.encode(s)
-        def decode(self, s):
-            return self.tokenizer.decode(s)
-
     args = Args(
-        tokenizer = Tokenizer('data/Gemma/tokenizer.model'),
-        vocab_size = 256000,
         vocab_dim = 32,
         latent_dim = 384,
         layers = ['Attention', 'MLP']*8,
         mlp_args = Args(
-            qk_dim = 64,
+            qk_dim = 384,
             kv_size = 384 * 3,
             kv_gate = False,
         ),
@@ -31,22 +18,41 @@ def RomeSetArgs(name):
             num_kv_groups = 8,
             rotary_embedding = True
         ),
+        post_sum_scale = False,
+        resident_scale = False,
         dropout = 0.1,
         bias = False, # bias in Linear?
     )
     match name:
+        case 'vsbase':
+            args.mlp_args.qk_dim = args.mlp_args.qk_dim
+        case 'vsvocabFull':
+            args.vocab_dim = args.latent_dim
+        case 'vsvocab16':
+            args.vocab_dim = 16
+        case 'vsqk_dim':
+            args.mlp_args.qk_dim = 64
+        case 'vskv_gate':
+            args.mlp_args.kv_gate = True
+        case 'vssum_scale':
+            args.post_sum_scale = True
+        case 'vsresident_scale':
+            args.resident_scale = True
+        case 'vsAFT':
+            args.layers = ['AFT', 'MLP']*(len(args.layers)//2)
+        case 'vsRet':
+            args.layers = ['Retention', 'MLP']*(len(args.layers)//2)
+        case 'vsTopk':
+            args.mlp_args.activation = 'topk'
+        case 'vsBias':
+            args.bias = True
+
         case 'Ret15m':
             args.layers = ['Retention', 'MLP']*11
         case 'AFT15m':
-            args.layers = ['AFTFull', 'MLP']*12
+            args.layers = ['AFT', 'MLP']*12
         case 'Gemma15m':
             args.layers = ['Attention', 'MLP']*12        
-        case 'Gemma15mNOV':
-            args.layers = ['Attention', 'MLP']*12
-            args.vocab_dim = args.latent_dim
-        case 'Gemma15mTopk':
-            args.layers = ['Attention', 'MLP']*12     
-            args.mlp_args.activation = 'topk'
         case '20m':
             args.layers = ['Attention', 'MLP']*15
         case '70m':
@@ -60,11 +66,26 @@ def RomeSetArgs(name):
     return args
 
 if __name__ == "__main__":
-    from RomeArena import TrainArena
-    TrainArena([
-        'RomeSet-Gemma15mTopk',
-        'RomeSet-Gemma15m',
+    from RomeArena import TrainArena, RunArena
+    roles = [
+        # 'RomeSet-vsbase',
+        'RomeSet-vsvocabFull',
+        # 'RomeSet-vsqk_dim',
+        # 'RomeSet-vsvocab16',          # 200321 - (-4)
+        # 'RomeSet-vskv_gate',
+        # 'RomeSet-vsAFT',
+        # 'RomeSet-vsRet',
+        # 'RomeSet-vsresident_scale',   # add score a little bit
+        # 'RomeSet-vssum_scale',        # 200321 - (-1)
+        # 'RomeSet-vsTopk',             # 200321 - (-2)
+        # 'RomeSet-vsBias',             # 200321 - (-3)
+
+
+        # 'RomeSet-Gemma15mTopk',
+        # 'RomeSet-Gemma15m',
         # 'RomeSet-AFT15m',
         # 'RomeSet-Ret15m',
         # 'RomeSet-Gemma15mNOV',
-    ], Args(lr = 6e-4, epochs=1))
+    ]
+    TrainArena(roles, Args(lr = 6e-3, epochs=3))
+    # RunArena(roles, 'My lord Sebastian')

@@ -16,6 +16,8 @@ def PredictionBlock(args):
     def __init__(self,args):
         latent_dim = args.latent_dim
         bias = getattr(args,'bias',False)
+        self.post_sum_scale = (lambda x,d:x*(d**-0.5)) if getattr(args, 'post_sum_scale', False) else (lambda x,d:x) 
+
         args = args.pred_args
         hidden_dim = getattr(args, 'hidden_dim', latent_dim)
         feat_dim = getattr(args,'feat_dim', hidden_dim)
@@ -24,6 +26,7 @@ def PredictionBlock(args):
         kv_gate = getattr(args, 'kv_gate', True)
         kernel_size = getattr(args, 'kernel_size', 3)
 
+        self.qk_dim = qk_dim
         self.feat_dim = feat_dim
         self.hidden_dim = hidden_dim
         self.kernel_size = kernel_size
@@ -38,16 +41,26 @@ def PredictionBlock(args):
     def forward(self, inputs, targets=False, state = None,**kwargs):
         (B, L, D) = inputs.shape
         (feat_dim, hidden_dim, kernel_size) = self.feat_dim, self.hidden_dim, self.kernel_size
-        (feat_x, x) = self.in_proj(inputs).split([feat_dim, hidden_dim], dim=2)
+
+        # in-proj
+        x = self.in_proj(inputs)
+        x = x if self.post_sum_scale is None else self.post_sum_scale(x, D)
+
+        # split x
+        (feat_x, x) = x.split([feat_dim, hidden_dim], dim=2)
+
+        # conv x
         feat_x = np.pad(feat_x, (0,0,kernel_size-1,0), value=float(0.))
+        feat_x = feat_x if self.post_sum_scale is None else self.post_sum_scale(feat_x, feat_dim*self.kernel_size)
         feat_x = self.Conv(feat_x.unsqueeze(1)) # B, qk_dim, L, 1
         feat_x = np.einsum('bqlw->blq', feat_x)
         feat_x = np.gelu(feat_x)
-        feat_x = self.K(feat_x)
+        feat_x = self.post_sum_scale(self.K(feat_x), self.qk_dim)
         feat_x = np.softmax(feat_x,dim=-1)
         y = self.V(feat_x)
         if self.out_proj is not None:
             y = self.out_proj(y)
+        y = y if self.post_sum_scale is None else self.post_sum_scale(y, hidden_dim)
         if targets is not None:
             loss = None if L <= 1 else np.mse_loss(y[:,:L-1], x[:,1:])
             return y, loss
