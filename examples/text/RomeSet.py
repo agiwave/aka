@@ -69,17 +69,16 @@ if __name__ == "__main__":
     from RomeArena import TrainArena, RunArena
     roles = [
         # 'RomeSet-vsbase',
-        'RomeSet-vsvocabFull',
+        # 'RomeSet-vsvocabFull',
         # 'RomeSet-vsqk_dim',
         # 'RomeSet-vsvocab16',          # 200321 - (-4)
         # 'RomeSet-vskv_gate',
         # 'RomeSet-vsAFT',
-        # 'RomeSet-vsRet',
+        'RomeSet-vsRet',
         # 'RomeSet-vsresident_scale',   # add score a little bit
         # 'RomeSet-vssum_scale',        # 200321 - (-1)
         # 'RomeSet-vsTopk',             # 200321 - (-2)
         # 'RomeSet-vsBias',             # 200321 - (-3)
-
 
         # 'RomeSet-Gemma15mTopk',
         # 'RomeSet-Gemma15m',

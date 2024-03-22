@@ -23,81 +23,28 @@ def RetentionBlock(args):
         self.group_norm = nn.RMSNorm(self.head_dim)
         return self
 
-    def compute_mask(qlen, klen, latent_dim, num_heads, get_decay_scale=True, mode='parallel'):
+    def compute_mask(qlen, klen, latent_dim, num_heads):
+        # Multi-Scale for diff heads.
         decay = np.log(
             1 - 2 ** (-5 - np.arange(num_heads, dtype=np.float))
         )
-        if mode == "recurrent":
-            retention_info = (decay.view(1, -1, 1, 1).exp(), None, None)
-        else:
-            index = np.arange(klen).to(decay)
-            mask = np.tril(np.ones(qlen, klen), diagonal=klen-qlen).to(decay)
-            mask = np.masked_fill(
-                index[-qlen:, None] - index[None, :], ~mask.bool(), float("inf")
-            )
-            # Hard to believe it, Diff decay for diff heads?
-            mask = np.exp(mask * decay[:, None, None])
-            mask = np.nan_to_num(mask)
-            mask = mask.unsqueeze(0)  # [1, h, t, t]
+        index = np.arange(klen).to(decay)
+        mask = np.tril(np.ones(qlen, klen), diagonal=klen-qlen).to(decay)
+        mask = np.masked_fill(
+            index[-qlen:, None] - index[None, :], ~mask.bool(), float("inf")
+        )
+        mask = np.exp(mask * decay[:, None, None])
+        mask = np.nan_to_num(mask)
+        mask = mask.unsqueeze(0)  # [1, h, t, t]
+        mask = mask / mask.sum(dim=-1, keepdim=True).sqrt()
 
-            # scaling
-            mask = mask / mask.sum(dim=-1, keepdim=True).sqrt()
-            mask = np.nan_to_num(mask, nan=0.0)
+        # scaling
+        mask = np.nan_to_num(mask, nan=0.0)
 
-            # decay_scale (used for kv cache)
-            if get_decay_scale:
-                exponent = np.arange(klen, device=decay.device).float()
-                decay_scale = decay.exp().view(-1, 1) ** exponent.view(1, -1)  # [h, t]
-                decay_scale = decay_scale.sum(-1).view(1, -1, 1, 1)  # [b, h, 1, 1]
-            else:
-                decay_scale = None
-
-            # mask processing for intra decay
-            intra_decay = mask[:, :, -1]
-            retention_info = (mask, intra_decay, decay_scale)
-        return retention_info
-
-    def recurrent_retention(self, q, k, v, decay, kv_cache=None, retention_mask=None):
-        """
-        q, k, v, # bsz * num_head * 1 * qkv_dim
-        kv_cache:
-            - "prev_key_value"  # bsz * num_head * v_dim * qk_dim
-            - "scale"  # (1 or bsz) * num_head * 1 * 1
-        decay # (1 or bsz) * num_head * 1 * 1
-        retention_mask # bsz * 1
-        """
-        if retention_mask is not None:
-            retention_mask = retention_mask.float().view(-1, 1, 1, 1).to(decay)
-        else:
-            retention_mask = np.ones(k.size(0), 1, 1, 1).to(decay)
-        # (b, h, v_dim, qk_dim)
-        current_kv = k * v.transpose(-1, -2) * retention_mask
-
-        if kv_cache is not None and "prev_key_value" in kv_cache:
-            prev_kv = kv_cache["prev_key_value"]
-            prev_scale = kv_cache["scale"]
-            scale = np.where(retention_mask == 0, prev_scale, prev_scale * decay + 1)
-            # connect prev_kv and current_kv
-            # how much to decay prev_kv
-            decay_amount = prev_scale.sqrt() * decay / scale.sqrt()
-            decay_amount = np.where(retention_mask == 0, 1, decay_amount)
-            prev_kv = prev_kv * decay_amount  # decay prev_kv
-            current_kv = current_kv / scale.sqrt()  # scale current_kv
-            current_kv = np.nan_to_num(
-                current_kv, nan=0.0
-            )  # remove nan, scale might be 0
-
-            current_kv = prev_kv + current_kv
-        else:
-            scale = np.ones_like(decay)
-            # when retention_mask is 0 at the beginning, setting scale to 1 will
-            # make the first retention to use the padding incorrectly. Hence,
-            # setting it to 0 here. This is a little ugly, so we might want to
-            # change this later. TODO: improve
-            scale = np.where(retention_mask == 0, np.zeros_like(decay), scale)
-
-        output = np.sum(q * current_kv, dim=3).unsqueeze(1)  # (b, 1, h, d_v)
-        return output, {"prev_key_value": current_kv, "scale": scale}
+        # decay_scale (used for kv cache)
+        scale = decay.exp().view(-1, 1) ** index.view(1, -1)  # [h, t]
+        scale = scale.sum(-1).view(1, -1, 1, 1)  # [b, h, 1, 1]
+        return (mask, scale)
 
     def apply_rotary_emb(x, cache, pos=0):
         _,_,L,D = x.shape
@@ -117,15 +64,15 @@ def RetentionBlock(args):
         y = np.stack((-x2, x1), dim=-1).flatten(-2)
         return (x * cos[pos:pos+L]) + (y * sin[pos:pos+L])
 
-    def forward(self, hidden_states, gctx = {}, state = None, **kwargs): 
+    def forward(self, hidden_states, gctx={}, state=None, **kwargs): 
         B, T, H = hidden_states.size()
         q, k, v, g = [proj(hidden_states) for proj in [self.q_proj, self.k_proj, self.v_proj, self.g_proj]]
         q, k, v = [t.view(B, T, self.num_heads, -1) for t in [q,k,v]]
         k *= self.scaling
 
         # -- append kv cache --
-        mode = 'parallel' if T > 1 else 'recurrent'
-        # mode = 'parallel'
+        parallel = True if T > 1 else False
+        # parallel = True
         # if state is not None:
         #     window_size = self.window_size if self.window_size is not None else 128
         #     if 'cache_kv2' in state:
@@ -139,19 +86,13 @@ def RetentionBlock(args):
         q = apply_rotary_emb(q, gctx, pos=k.size(2)-T)
         k = apply_rotary_emb(k, gctx)
 
-        if state is not None:
-            mask = state.get(mode, None)
+        if parallel:
+            mask = gctx.get('decay_mask', None)
             if mask is None or mask[0].size(2) != q.size(2) or mask[0].size(3) != k.size(2):
-                mask = compute_mask(q.size(2), k.size(2), self.embed_dim, self.num_heads, mode=mode)
-                state[mode] = mask
-        else:
-            mask = compute_mask(q.size(2), k.size(2), self.embed_dim, self.num_heads, mode=mode)
-        (decay_mask, intra_decay, scale) = mask
+                mask = compute_mask(q.size(2), k.size(2), self.embed_dim, self.num_heads)
+                gctx['decay_mask'] = mask
+            (decay_mask, scale) = mask
 
-        # -- Cache load --
-        kv_cache = None if state is None else state.get('kv_cache', None)
-
-        if mode == 'parallel':
             # retention(q,k,v)
             retention = np.einsum('bnld,bnmd->bnlm', q, k)
             retention = retention * decay_mask 
@@ -160,30 +101,40 @@ def RetentionBlock(args):
             ).clamp(min=1, max=5e4)
             retention_out = np.einsum('bnlm,bnmd->blnd', retention, v)
 
-            # kv cache: [b, h, t, v_dim, qk_dim]
-            # What's this? :) This could not be S(n) = gamma * S(n-1) + K(n) @ V(n)
-            # This is just a approximation.
-            current_kv = k.unsqueeze(-2) * v.unsqueeze(-1)
-            intra_decay = intra_decay[:, :, :, None, None]  # [b, h, t, 1, 1]
-            current_kv = (current_kv * intra_decay).sum(2)  # [b, h, v_dim, qk_dim]
-            kv_cache = {"prev_key_value": current_kv, "scale": scale}
+            if state is not None:
+                # kv cache: [b, h, t, v_dim, qk_dim]
+                # What's this? :) This could not be S(n) = gamma * S(n-1) + K(n) @ V(n)
+                # This is just a approximation.
+                current_kv = k.unsqueeze(-2) * v.unsqueeze(-1)
+                intra_decay = decay_mask[:, :, -1, :, None, None]  # [b, h, t, 1, 1]
+                current_kv = (current_kv * intra_decay).sum(2)  # [b, h, v_dim, qk_dim]
+                state["prev_key_value"] = current_kv
+                state["scale"] = scale
         else:
-            retention_out, kv_cache = self.recurrent_retention(q,k,v,
-                decay_mask,
-                kv_cache=kv_cache
-            )
+            decay = np.log(
+                1 - 2 ** (-5 - np.arange(self.num_heads, dtype=np.float))
+            ).view(1, -1, 1, 1).exp()
+            current_kv = k * v.transpose(-1, -2)
+            if "prev_kv" in state:
+                prev_kv = state["prev_kv"]
+                prev_scale = state["prev_scale"]
+                current_scale = prev_scale * decay + 1
+                decay_amount = prev_scale.sqrt() * decay / current_scale.sqrt()
+                prev_kv = prev_kv * decay_amount  # decay prev_kv
+                current_kv = current_kv / current_scale.sqrt()  # scale current_kv
+                current_kv = prev_kv + current_kv
+            else:
+                current_scale = np.ones_like(decay)
 
-        # -- Cache save --
-        if state is not None:
-            state['kv_cache'] = kv_cache
+            state["prev_kv"] = current_kv
+            state["prev_scale"] = current_scale
+            retention_out = np.sum(q * current_kv, dim=3).unsqueeze(1)  # (b, 1, h, d_v)
 
         # norm
         normed = self.group_norm(retention_out).reshape(B, hidden_states.size(1), self.value_dim)
-        # out gate & proj
         out = self.gate_fn(g) * normed
         return self.out_proj(out)
-
-    return __init__(nn.Module(forward=forward,recurrent_retention=recurrent_retention), args)
+    return __init__(nn.Module(forward=forward), args)
 
 def RetentionArgs(name):
     args = Args(
