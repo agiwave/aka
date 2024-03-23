@@ -64,7 +64,7 @@ def RetentionBlock(args):
         y = np.stack((-x2, x1), dim=-1).flatten(-2)
         return (x * cos[pos:pos+L]) + (y * sin[pos:pos+L])
 
-    def forward(self, hidden_states, gctx={}, state=None, **kwargs): 
+    def forward(self, hidden_states, ctx={}, state=None, **kwargs): 
         B, T, H = hidden_states.size()
         q, k, v, g = [proj(hidden_states) for proj in [self.q_proj, self.k_proj, self.v_proj, self.g_proj]]
         q, k, v = [t.view(B, T, self.num_heads, -1) for t in [q,k,v]]
@@ -83,14 +83,14 @@ def RetentionBlock(args):
 
         # -- rotary embedding --
         q, k, v = [np.einsum('blnd->bnld', t) for t in [q, k, v]]
-        q = apply_rotary_emb(q, gctx, pos=k.size(2)-T)
-        k = apply_rotary_emb(k, gctx)
+        q = apply_rotary_emb(q, ctx, pos=k.size(2)-T)
+        k = apply_rotary_emb(k, ctx)
 
         if parallel:
-            mask = gctx.get('decay_mask', None)
+            mask = ctx.get('decay_mask', None)
             if mask is None or mask[0].size(2) != q.size(2) or mask[0].size(3) != k.size(2):
                 mask = compute_mask(q.size(2), k.size(2), self.embed_dim, self.num_heads)
-                gctx['decay_mask'] = mask
+                ctx['decay_mask'] = mask
             (decay_mask, scale) = mask
 
             # retention(q,k,v)
