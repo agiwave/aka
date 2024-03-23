@@ -1,6 +1,5 @@
 import aka.nn as nn
 import aka.numpy as np
-from aka.nn import Args
 
 def PredictionBlock(args):
     '''
@@ -70,18 +69,18 @@ def PredictionBlock(args):
     return __init__(nn.Module(forward=forward), args)
 
 def PredictionArgs(name):
-    args = Args(
+    args = nn.Args(
         vocab_size = 256000,
         vocab_dim = 32,
         latent_dim = 384,
         layers = ['Attention', 'MLP']*8,
-        attn_args = Args(
+        attn_args = nn.Args(
             windows_size = 128,  # Limit Attention Seq Length to 256. Gemma2b --> 8192
             num_heads = 8,
             num_kv_groups = 8,
             rotary_embedding = True
         ),
-        pred_args = Args(
+        pred_args = nn.Args(
             qk_dim = 64,
             kv_size = 384 * 3,
             kv_gate = False,
@@ -103,7 +102,7 @@ if __name__ == "__main__":
     from RomeArena import TrainArena, RunArena
     TrainArena([
         'Prediction-base'
-    ], Args(lr = 6e-4, epochs=3))
+    ], nn.Args(lr = 6e-4, epochs=3))
 
     # RunArena([
     #     'Prediction-base'

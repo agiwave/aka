@@ -1,14 +1,13 @@
 import aka.nn as nn
 import aka.numpy as np
 import aka.repo as repo
-from aka.nn import Args
 
 def LLaMA(name):
     tokenizer = repo.AutoTokenizer(name)
     cfg = repo.fopen(name, 'config.json', ftype='json')
 
     # -- TODO Check it --
-    args = Args(
+    args = nn.Args(
         tokenizer = tokenizer,
         vocab_size = 32000,
         block_size = 2048,
@@ -17,11 +16,11 @@ def LLaMA(name):
         lm_head = True,
 
         layers = ['Attention', 'MLP']*32,
-        attn_args = Args(
+        attn_args = nn.Args(
             num_heads = 8,
             num_kv_groups = 1
         ),
-        mlp_args = Args(
+        mlp_args = nn.Args(
             kv_size = 4096*4,   # ???
             kv_gate = True,
         ),

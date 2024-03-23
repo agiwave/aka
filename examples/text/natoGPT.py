@@ -2,7 +2,6 @@
 # os.environ["aka_provider_name"] = "aka.providers.torch"
 import aka.nn as nn
 import aka.numpy as np
-from aka.nn import Args
 
 """
 Full definition of a GPT Language Model, all of it in this single file.
@@ -167,7 +166,7 @@ if __name__ == "__main__":
             )
             return x,y
             
-    args = Args(
+    args = nn.Args(
         vocab_size = 50304,
         block_size = 256, # context of up to 256 previous characters
 

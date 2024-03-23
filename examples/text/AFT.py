@@ -1,7 +1,6 @@
 
 import aka.nn as nn
 import aka.numpy as np
-from aka.nn import Args
 
 def AFTBlock(args):
     return AFTFullBlock(args)
@@ -162,4 +161,4 @@ if __name__ == "__main__":
     from RomeArena import TrainArena
     TrainArena([
         'RomeSet-AFT15m'
-    ], Args(lr = 6e-4, epochs=3))
+    ], nn.Args(lr = 6e-4, epochs=3))

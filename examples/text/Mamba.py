@@ -1,10 +1,9 @@
 import aka.nn as nn
 import aka.numpy as np
-from aka.nn import Args
 
 def MambaArgs(name):
-    args = Args(
-        mamba_args = Args(
+    args = nn.Args(
+        mamba_args = nn.Args(
             conv_kernel_size = 4,
             conv_bias = True
         )
@@ -134,7 +133,7 @@ def Mamba(name):
     # -- Tokenizer --
     tokenizer = repo.AutoTokenizer(name)
     cfg = repo.fopen(name, 'config.json', ftype='json')
-    args = Args(
+    args = nn.Args(
         tokenizer = tokenizer,
         vocab_size = cfg['vocab_size'],
         latent_dim = cfg['d_model'],

@@ -1,18 +1,17 @@
 import aka.nn as nn
 import aka.numpy as np
-from aka.nn import Args
 
 def RomeSetArgs(name):
-    args = Args(
+    args = nn.Args(
         vocab_dim = 32,
         latent_dim = 384,
         layers = ['Attention', 'MLP']*8,
-        mlp_args = Args(
+        mlp_args = nn.Args(
             qk_dim = 384,
             kv_size = 384 * 3,
             kv_gate = False,
         ),
-        attn_args = Args(
+        attn_args = nn.Args(
             windows_size = 128,  # Limit Attention Seq Length to 256. Gemma2b --> 8192
             num_heads = 8,
             num_kv_groups = 8,
@@ -86,5 +85,5 @@ if __name__ == "__main__":
         # 'RomeSet-Ret15m',
         # 'RomeSet-Gemma15mNOV',
     ]
-    # TrainArena(roles, Args(lr = 6e-3, epochs=3))
+    # TrainArena(roles, nn.Args(lr = 6e-3, epochs=3))
     RunArena(roles, 'My lord Sebastian')

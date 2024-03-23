@@ -1,7 +1,6 @@
 import math
 import aka.nn as nn
 import aka.numpy as np
-from aka.nn import Args
 
 def MetaLayer(name, args):
     '''
@@ -190,7 +189,7 @@ def CausalLM(args):
     return __init__(nn.Module(forward = forward, generate = generate, generator=generator),args)
 
 def CausalLMArgs(name):
-    args = Args(
+    args = nn.Args(
         vocab_size = 50304,
         vocab_dim = 64,
         block_size = 256,
@@ -201,13 +200,13 @@ def CausalLMArgs(name):
         bias = False, # do we use bias inside LayerNorm and Linear layers?
 
         layers = ['Attention', 'MLP']*6,
-        mlp_args = Args(
+        mlp_args = nn.Args(
             kv_size = 384*4,
             kv_gate = True,
             qk_dim = 384,
             hidden_dim = 384
         ),
-        attn_args = Args(
+        attn_args = nn.Args(
             qk_dim = 384,
             hidden_dim = 384,
             num_heads = 6,
@@ -221,7 +220,7 @@ if __name__ == "__main__":
     from RomeArena import TrainArena, RunArena
     TrainArena([
         'CausalLM-demo'
-    ], Args(lr = 6e-4, epochs=3))
+    ], nn.Args(lr = 6e-4, epochs=3))
     # RunArena([
     #     'CausalLM-demo'
     # ], "Paul Daniels (born 4 June 1981 in Burlington)")

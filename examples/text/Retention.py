@@ -1,6 +1,5 @@
 import aka.nn as nn
 import aka.numpy as np
-from aka.nn import Args
 
 def RetentionBlock(args):
     def __init__(self,args):
@@ -137,16 +136,16 @@ def RetentionBlock(args):
     return __init__(nn.Module(forward=forward), args)
 
 def RetentionArgs(name):
-    args = Args(
+    args = nn.Args(
         vocab_dim = 32,
         latent_dim = 384,
         layers = ['Attention', 'MLP']*8,
-        mlp_args = Args(
+        mlp_args = nn.Args(
             qk_dim = 64,
             kv_size = 384 * 3,
             kv_gate = False,
         ),
-        attn_args = Args(
+        attn_args = nn.Args(
             num_heads = 8,
             num_kv_groups = 8,
             rotary_embedding = True,
@@ -168,7 +167,7 @@ def RetNet(name):
     # -- Tokenizer --
     tokenizer = repo.AutoTokenizer(name)
     cfg = repo.fopen(name, 'config.json', ftype='json')
-    args = Args(
+    args = nn.Args(
         tokenizer = tokenizer,
         vocab_size = cfg['vocab_size'],
         embedding_scale = True,
@@ -191,34 +190,34 @@ def RetNet(name):
 
     # -- Model --
     from CausalLM import CausalLM
-    model = CausalLM(args)
+    m = CausalLM(args)
     if repo.exist(name, "model.safetensors"):
         with repo.fopen(name, "model.safetensors", ftype='safetensor') as f:
             keys = f.keys()
             with np.no_grad():
-                model.lm_head.weight.copy_(f.get_tensor(f'lm_head.weight'))
-                model.embedding.weight.copy_(f.get_tensor('model.embed_tokens.weight'))
-                model.post_norm.weight.copy_(f.get_tensor(f'model.layer_norm.weight'))
-                model.prev_norm.weight.copy_(f.get_tensor(f'model.layernorm_embedding.weight'))
-                for i in range(len(model.layers)//2):
-                    model.layers[i*2].norm.weight.copy_(f.get_tensor(f'model.layers.{i}.retention_layer_norm.weight'))
-                    model.layers[i*2].layer.q_proj.weight.copy_(f.get_tensor(f'model.layers.{i}.retention.q_proj.weight'))
-                    model.layers[i*2].layer.g_proj.weight.copy_(f.get_tensor(f'model.layers.{i}.retention.g_proj.weight'))
-                    model.layers[i*2].layer.k_proj.weight.copy_(f.get_tensor(f'model.layers.{i}.retention.k_proj.weight'))
-                    model.layers[i*2].layer.v_proj.weight.copy_(f.get_tensor(f'model.layers.{i}.retention.v_proj.weight'))
-                    model.layers[i*2].layer.out_proj.weight.copy_(f.get_tensor(f'model.layers.{i}.retention.out_proj.weight'))
-                    model.layers[i*2+1].norm.weight.copy_(f.get_tensor(f'model.layers.{i}.final_layer_norm.weight'))
+                m.lm_head.weight.copy_(f.get_tensor(f'lm_head.weight'))
+                m.embedding.weight.copy_(f.get_tensor('model.embed_tokens.weight'))
+                m.post_norm.weight.copy_(f.get_tensor(f'model.layer_norm.weight'))
+                m.prev_norm.weight.copy_(f.get_tensor(f'model.layernorm_embedding.weight'))
+                for i in range(len(m.layers)//2):
+                    m.layers[i*2].norm.weight.copy_(f.get_tensor(f'model.layers.{i}.retention_layer_norm.weight'))
+                    m.layers[i*2].layer.q_proj.weight.copy_(f.get_tensor(f'model.layers.{i}.retention.q_proj.weight'))
+                    m.layers[i*2].layer.g_proj.weight.copy_(f.get_tensor(f'model.layers.{i}.retention.g_proj.weight'))
+                    m.layers[i*2].layer.k_proj.weight.copy_(f.get_tensor(f'model.layers.{i}.retention.k_proj.weight'))
+                    m.layers[i*2].layer.v_proj.weight.copy_(f.get_tensor(f'model.layers.{i}.retention.v_proj.weight'))
+                    m.layers[i*2].layer.out_proj.weight.copy_(f.get_tensor(f'model.layers.{i}.retention.out_proj.weight'))
+                    m.layers[i*2+1].norm.weight.copy_(f.get_tensor(f'model.layers.{i}.final_layer_norm.weight'))
 
                     # Take care here. gate and fc1 are just swaped.
-                    model.layers[i*2+1].layer.gate_proj.weight.copy_(f.get_tensor(f'model.layers.{i}.ffn.fc1.weight'))
-                    model.layers[i*2+1].layer.up_proj.weight.copy_(f.get_tensor(f'model.layers.{i}.ffn.gate.weight'))
-                    model.layers[i*2+1].layer.down_proj.weight.copy_(f.get_tensor(f'model.layers.{i}.ffn.fc2.weight'))
-    return model
+                    m.layers[i*2+1].layer.gate_proj.data.copy_(f.get_tensor(f'model.layers.{i}.ffn.fc1.weight'))
+                    m.layers[i*2+1].layer.up_proj.data.copy_(f.get_tensor(f'model.layers.{i}.ffn.gate.weight'))
+                    m.layers[i*2+1].layer.down_proj.data.copy_(f.get_tensor(f'model.layers.{i}.ffn.fc2.weight'))
+    return m
 
 if __name__ == "__main__":
-    retnet = RetNet('data/SDPrompt-RetNet-300M')
+    m = RetNet('data/SDPrompt-RetNet-300M')
     print('Model loaded')
-    for w in retnet.generator("1girl"):
+    for w in m.generator("1girl"):
         print(w, end='')
 # <s> 1girl, absurdres, animal ear fluff, animal ears, bangs, bare shoulders, black hair, blue archive, blunt bangs, blush, closed mouth, collarbone, commentary request, eyes visible through hair, green eyes, hair between eyes, halo, hand on own face, hand up, highres, jacket, kisaki blue archive, long hair, long sleeves, looking at viewer, open clothes, open jacket, shinonome asu, simple background, solo, track jacket, upper body, white background, white jacket</s>
     # from RomeArena import TrainArena

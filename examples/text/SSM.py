@@ -1,7 +1,6 @@
 
 import aka.nn as nn
 import aka.numpy as np
-from aka.nn import Args
 
 def SSMBlock(args):
     '''

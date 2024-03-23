@@ -5,7 +5,6 @@ import aka.nn as nn
 import aka.numpy as np
 import aka.repo as repo
 import aka.data
-from aka.nn import Args
 from CausalLM import CausalLM
 
 if __name__ == "__main__":
@@ -16,7 +15,7 @@ if __name__ == "__main__":
         'data/shakespeare/train.txt'
     ])
 
-    args = Args(
+    args = nn.Args(
         tokenizer = tokenizer,
         vocab_size = 50257,
         vocab_dim = 64,
@@ -25,11 +24,11 @@ if __name__ == "__main__":
         bias = False, # do we use bias inside LayerNorm and Linear layers?
 
         layers = ['Attention', 'MLP']*6,
-        mlp_args = Args(
+        mlp_args = nn.Args(
             kv_size = 768*4,
             kv_gate = False,
         ),
-        attn_args = Args(
+        attn_args = nn.Args(
             window_size = 256,
             num_heads = 12,
             num_kv_groups = 12,

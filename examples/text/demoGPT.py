@@ -3,7 +3,6 @@
 import aka.nn as nn
 import aka.repo as repo
 import aka.data
-from aka.nn import Args
 
 if __name__ == "__main__":
     tokenizer = repo.AutoTokenizer('data/mamba-370m-hf')
@@ -12,7 +11,7 @@ if __name__ == "__main__":
         'data/shakespeare/train.txt'
     ])
 
-    args = Args(
+    args = nn.Args(
         tokenizer = tokenizer,
         vocab_size = 50304,
         vocab_dim = 64,
@@ -22,12 +21,12 @@ if __name__ == "__main__":
 
         # -- Layer args --
         layers = ['Attention', 'MLP']*12,
-        mlp_args = Args(
+        mlp_args = nn.Args(
             qk_dim = 64,
             kv_size = 384*4,
             kv_gate = True,
         ),
-        attn_args = Args(
+        attn_args = nn.Args(
             window_size = 256,
             num_heads = 6,
             num_kv_groups = 6,

@@ -6,7 +6,6 @@ os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 import aka.nn as nn
 import aka.repo as repo
 import aka.data
-from aka.nn import Args
 
 def TrainArena(names, train_args):
     # -- Tokenizer --
@@ -24,7 +23,7 @@ def TrainArena(names, train_args):
     # vocab_size = 256000
     
     # -- Roles --
-    roles = [Args(name=name) for name in names]
+    roles = [nn.Args(name=name) for name in names]
     import importlib
     for role in roles:
         module_name, sub_name = role.name.split('-')
@@ -75,7 +74,7 @@ def RunArena(names, prompt):
     tokenizer = repo.AutoTokenizer('data/mamba-370m-hf')
 
     # -- Roles --
-    roles = [Args(name=name) for name in names]
+    roles = [nn.Args(name=name) for name in names]
     import importlib
     for role in roles:
         module_name, sub_name = role.name.split('-')
@@ -111,5 +110,5 @@ if __name__ == "__main__":
         # 'RomeSet-vbdimpad',
         # 'RomeSet-vbdim',
         # 'RomeSet-novbdim',
-        ], Args(lr = 6e-4, epochs=1)
+        ], nn.Args(lr = 6e-4, epochs=1)
     )

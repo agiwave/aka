@@ -1,6 +1,5 @@
 import aka.nn as nn
 import aka.numpy as np
-from aka.nn import Args
 
 try:
     from xformers.ops.fmha import memory_efficient_attention
@@ -26,6 +25,7 @@ def AttentionBlock(args):
         # -- Global Args --
         latent_dim = args.latent_dim
         bias = getattr(args, 'bias', False)
+        dropout = getattr(args, 'dropout', 0.2)
 
         # -- Attention Args
         args = args.attn_args
@@ -33,8 +33,6 @@ def AttentionBlock(args):
         attn_hidden_dim = getattr(args, 'hidden_dim', latent_dim)
         attn_heads = getattr(args, 'num_heads', 1)
         attn_kv_groups = getattr(args, 'num_kv_groups', attn_heads)
-        bias = getattr(args, 'bias', False)
-        dropout = getattr(args, 'dropout', 0.2)
         attn_head_dim = attn_qk_dim//attn_heads
         k_dim = attn_head_dim * attn_kv_groups
         v_dim = attn_hidden_dim//attn_heads * attn_kv_groups
@@ -138,9 +136,9 @@ def AttentionBlock(args):
 
 # --- Example ---
 if __name__ == "__main__":
-    atten = AttentionBlock(Args(
+    atten = AttentionBlock(nn.Args(
         latent_dim = 384,
-        attn_args = Args(
+        attn_args = nn.Args(
             window_size = 128,
             hidden_dim = 256,
             qk_dim = 384,

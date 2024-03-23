@@ -1,6 +1,5 @@
 import aka.nn as nn
 import aka.numpy as np
-from aka.nn import Args
 
 def GemmaEmbNorm():
     def forward(self, x):
@@ -21,17 +20,17 @@ def GemmaArgs(name):
         def decode(self, s):
             return self.tokenizer.decode(s)
 
-    args = Args(
+    args = nn.Args(
         tokenizer = Tokenizer('data/Gemma/tokenizer.model'),
         vocab_size = 256000,
         latent_dim = 2048,
         prev_norm = 'gemma',
         layers = ['AttentionKV', 'MLP']*18,
-        mlp_args = Args(
+        mlp_args = nn.Args(
             kv_size = 0,
             kv_gate = True,
         ),
-        attn_args = Args(
+        attn_args = nn.Args(
             windows_size = 256,  # Limit Attention Seq Length to 256. Gemma2b --> 8192
             num_heads = 8,
             num_kv_groups = 1,
@@ -74,7 +73,7 @@ def GemmaArgs(name):
 
 def Gemma(name, ckpt=None):
     from CausalLM import CausalLM
-    gemma = CausalLM(GemmaArgs(name))
+    m = CausalLM(GemmaArgs(name))
     if ckpt is not None:
         state = np.load(
             ckpt, mmap=True, weights_only=True,
@@ -97,20 +96,20 @@ def Gemma(name, ckpt=None):
                     weight = nn.Parameter(np.ones(dim)))
         ''' 
         with np.no_grad():
-            gemma.embedding.weight.copy_(state['embedder.weight'])
-            gemma.post_norm.weight.copy_(state['model.norm.weight']+1)
-            for i in range(len(gemma.layers)//2):
-                gemma.layers[i*2].norm.weight.copy_(state[f'model.layers.{i}.input_layernorm.weight']+1)
-                gemma.layers[i*2].layer.in_proj.weight.copy_(state[f'model.layers.{i}.self_attn.qkv_proj.weight'])
-                gemma.layers[i*2].layer.out_proj.weight.copy_(state[f'model.layers.{i}.self_attn.o_proj.weight'])
-                gemma.layers[i*2+1].norm.weight.copy_(state[f'model.layers.{i}.post_attention_layernorm.weight']+1)
-                gemma.layers[i*2+1].layer.gate_proj.weight.copy_(state[f'model.layers.{i}.mlp.gate_proj.weight'])
-                gemma.layers[i*2+1].layer.up_proj.weight.copy_(state[f'model.layers.{i}.mlp.up_proj.weight'])
-                gemma.layers[i*2+1].layer.down_proj.weight.copy_(state[f'model.layers.{i}.mlp.down_proj.weight'])
-    return gemma
+            m.embedding.weight.copy_(state['embedder.weight'])
+            m.post_norm.weight.copy_(state['model.norm.weight']+1)
+            for i in range(len(m.layers)//2):
+                m.layers[i*2].norm.weight.copy_(state[f'model.layers.{i}.input_layernorm.weight']+1)
+                m.layers[i*2].layer.in_proj.weight.copy_(state[f'model.layers.{i}.self_attn.qkv_proj.weight'])
+                m.layers[i*2].layer.out_proj.weight.copy_(state[f'model.layers.{i}.self_attn.o_proj.weight'])
+                m.layers[i*2+1].norm.weight.copy_(state[f'model.layers.{i}.post_attention_layernorm.weight']+1)
+                m.layers[i*2+1].layer.gate_proj.data.copy_(state[f'model.layers.{i}.mlp.gate_proj.weight'])
+                m.layers[i*2+1].layer.up_proj.data.copy_(state[f'model.layers.{i}.mlp.up_proj.weight'])
+                m.layers[i*2+1].layer.down_proj.data.copy_(state[f'model.layers.{i}.mlp.down_proj.weight'])
+    return m
 
 if __name__ == "__main__":
-    gemma = Gemma('2b', 'data/Gemma/gemma-2b-it.ckpt')
+    m = Gemma('2b', 'data/Gemma/gemma-2b-it.ckpt')
     print('Model loaded')
-    for w in gemma.generator("The life meaning is"):
+    for w in m.generator("The life meaning is"):
         print(w, end='')
