@@ -56,11 +56,11 @@ def MLPBlock(args):
         self.num_heads = getattr(args, 'num_heads', 1)
         self.in_proj = None if qk_dim is None else nn.Linear(latent_dim, self.qk_dim, bias=bias)        # Q
         if self.num_heads == 1:
-            self.up_proj = nn.Parameter(shape=(kv_size, qk_dim))                                        # K(reversed)
-            self.gate_proj = None if not kv_gate else nn.Parameter(shape=(kv_size, qk_dim))             # G or mask
+            self.up_proj = nn.Parameter(shape=(kv_size, self.qk_dim))                                        # K(reversed)
+            self.gate_proj = None if not kv_gate else nn.Parameter(shape=(kv_size, self.qk_dim))             # G or mask
             self.down_proj = nn.Parameter(shape=(hidden_dim, kv_size))                                  # V
         else:
-            h_qk_dim = qk_dim // self.num_heads
+            h_qk_dim = self.qk_dim // self.num_heads
             h_hd_dim = hidden_dim // self.num_heads
             self.up_proj = nn.Parameter(shape=(self.num_heads, kv_size, h_qk_dim))                                        # K(reversed)
             self.gate_proj = None if not kv_gate else nn.Parameter(shape=(self.num_heads, kv_size, h_qk_dim))             # G or mask
@@ -121,10 +121,10 @@ def MLPArgs(name):
             args.mlp_args.kv_size = 384 * 3
         case 'h4':
             args.mlp_args.num_heads = 4
-            args.mlp_args.kv_size = 384
+            args.mlp_args.kv_size = 384 * 3
         case 'h8':
             args.mlp_args.num_heads = 8
-            args.mlp_args.kv_size = 256
+            args.mlp_args.kv_size = 384 * 3
         case _:
             assert False, f"Unknown name{name}"
     return args

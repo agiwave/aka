@@ -36,7 +36,6 @@ def AttentionBlock(args):
         attn_head_dim = attn_qk_dim//attn_heads
         k_dim = attn_head_dim * attn_kv_groups
         v_dim = attn_hidden_dim//attn_heads * attn_kv_groups
-        window_size = getattr(args, 'window_size', None)
         assert attn_head_dim * attn_heads == attn_qk_dim
         assert attn_heads % attn_kv_groups == 0
         assert attn_hidden_dim % attn_heads == 0
@@ -44,7 +43,7 @@ def AttentionBlock(args):
         self.out_proj = nn.Linear(attn_hidden_dim, latent_dim, bias=bias)
         self.attn_dropout = nn.Dropout(dropout)
         self.resid_dropout = nn.Dropout(dropout)
-        self.window_size = window_size
+        self.window_size = getattr(args, 'window_size', None)
         self.hidden_dim = attn_hidden_dim
         self.attn_qk_dim = attn_qk_dim
         self.attn_k_dim = k_dim
@@ -80,7 +79,7 @@ def AttentionBlock(args):
         return np.reshape(y, (B,L,N,D))
 
     def causal_mask(shape, dtype, *, window_size = None, from_bottomright: bool = False,):
-        mask = np.full(shape,dtype=dtype,fill_value=1)
+        mask = np.full(shape, dtype=dtype, fill_value=1)
         shift = 0 if not from_bottomright else shape[-1] - shape[-2] # q_len - k_len
         mask = np.tril(mask, diagonal=shift)
         if window_size is not None:
