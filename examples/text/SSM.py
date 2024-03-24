@@ -41,7 +41,7 @@ def SSMBlock(args):
         return np.einsum('dn,bnd->bd', C, h)
     vmap_ssm = np.vmap(ssm, in_dims=(None,None,None,None,None,0), out_dims=(1))
 
-    def forward(self, inputs, *, ctx={}, state=None, **kwargs):
+    def forward(self, inputs, *, state=None, **kwargs):
         outputs = None
         window_size = self.window_size
         (hidden_dim, num_states) = self.hidden_dim, self.num_states

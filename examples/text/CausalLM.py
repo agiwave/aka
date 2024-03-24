@@ -68,7 +68,7 @@ def CausalLM(args):
         self.lm_head = None if not lm_head else nn.Linear(vocab_dim, args.vocab_size,bias=False)
         self.prev_norm = prev_norm
         self.post_norm = nn.RMSNorm(args.latent_dim)
-        self.ctx = {}
+        self.cache = {}
         return self
 
     def forward(self, inputs, targets=None, state=None):
@@ -87,7 +87,6 @@ def CausalLM(args):
         # -- layers --
         if self.prev_norm is not None:
             x = self.prev_norm(x)
-        ctx = self.ctx
         if(state is not None):
             layer_states = state.get('layer_states', None)
             if layer_states is None:
@@ -97,7 +96,7 @@ def CausalLM(args):
         layer_losses = []
         for i in range(len(self.layers)):
             l_state = None if state is None else layer_states[i]
-            x, loss = self.layers[i](x, ctx=ctx, state=l_state)
+            x, loss = self.layers[i](x, cache=self.cache, state=l_state)
             if loss is not None:
                 layer_losses.append(loss)
 

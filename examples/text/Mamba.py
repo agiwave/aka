@@ -51,7 +51,7 @@ def MambaBlock(args):
         self.out_proj = nn.Linear(mamba_args.qk_dim, args.latent_dim, bias=args.bias)
         return self
 
-    def forward(self, x, ctx={}, state=None, **kwargs):
+    def forward(self, x, state=None, **kwargs):
         (b, l, d) = x.shape
         (x, gate) = self.in_proj(x).chunk(2, dim=-1)
         

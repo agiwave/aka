@@ -10,7 +10,7 @@ def RomeSetArgs(name):
     )
     attn_args = nn.Args(
         name = 'Attention',
-        windows_size = 128,  # Limit Attention Seq Length to 256. Gemma2b --> 8192
+        windows_size = 128,
         num_heads = 8,
         num_kv_groups = 8,
         rotary_embedding = True

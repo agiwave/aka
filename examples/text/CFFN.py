@@ -37,7 +37,7 @@ def CFFNBlock(args):
         self.dropout = nn.Dropout(dropout)
         return self
 
-    def forward(self, x, *, ctx={}, state=None, **kwargs):
+    def forward(self, x, *, state=None, **kwargs):
         B, L, _ = x.size()
         x = x if self.in_proj is None else self.in_proj(x)
         if self.conv_size > 1:

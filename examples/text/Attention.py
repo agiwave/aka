@@ -86,7 +86,7 @@ def AttentionBlock(args):
             mask = np.triu(mask, diagonal=shift - window_size + 1)
         return np.log(mask)
 
-    def forward(self, x, *, ctx={}, state=None, **kwargs):
+    def forward(self, x, *, cache={}, state=None, **kwargs):
         B, L, _ = x.size()
 
         # -- qkv --
@@ -108,8 +108,8 @@ def AttentionBlock(args):
         # -- rotary embedding --
         M = k.size(1)
         if self.rot_embedding:
-            q = apply_rotary_emb(q, ctx, M-L)
-            k = apply_rotary_emb(k, ctx)
+            q = apply_rotary_emb(q, cache, M-L)
+            k = apply_rotary_emb(k, cache)
 
         # -- repeat kv to match q, MQA and GQA --
         if attn_kv_groups != attn_heads:
