@@ -3,26 +3,34 @@ import aka.numpy as np
 
 def MambaArgs(name):
     args = nn.Args(
-        mamba_args = nn.Args(
-            conv_kernel_size = 4,
-            conv_bias = True
-        )
+        latent_dim = 384
+    )
+    mamba_args = nn.Args(
+        name = 'Mamba',
+        conv_kernel_size = 4,
+        conv_bias = True
     )
     match name:
         case '20m':
             args.latent_dim = 384
-            args.layers = ['Mamba']*20
-            args.mamba_args.qk_dim = 384
-            args.mamba_args.d_state = 16
+            mamba_args.qk_dim = 384
+            mamba_args.d_state = 16
+            args.layers = [mamba_args]*20
         case _:
             assert False
-    args.mamba_args.dt_rank = args.latent_dim // 16
+    mamba_args.dt_rank = args.latent_dim // 16
     return args
 
 def MambaBlock(args):
     """A single Mamba block, as described in Figure 3 in Section 3.4 in the Mamba paper [1]."""
     def __init__(self, args):
-        mamba_args = args.mamba_args
+        mamba_args = nn.Args(
+            qk_dim = args.qk_dim,
+            dt_rank = args.dt_rank,
+            conv_kernel_size = args.conv_kernel_size,
+            conv_bias = args.conv_bias,
+            d_state = args.d_state
+        )
         A = np.repeat(np.arange(1, mamba_args.d_state + 1).unsqueeze(0), mamba_args.qk_dim, 0)
         self.args = mamba_args
         self.in_proj = nn.Linear(args.latent_dim, mamba_args.qk_dim*2, bias=args.bias)
@@ -137,17 +145,18 @@ def Mamba(name):
         tokenizer = tokenizer,
         vocab_size = cfg['vocab_size'],
         latent_dim = cfg['d_model'],
-        layers = ['Mamba']*cfg['n_layer'],
-        mamba_args = Args(
-            qk_dim = cfg['intermediate_size'],
-            dt_rank = "auto",
-            conv_kernel_size = 4,
-            conv_bias = True,
-            d_state = cfg['state_size']
-        ),
+        layers = [
+            nn.Args(
+                name = 'Mamba',
+                qk_dim = cfg['intermediate_size'],
+                dt_rank = cfg['d_model']//16,
+                conv_kernel_size = 4,
+                conv_bias = True,
+                d_state = cfg['state_size']
+            )
+        ]*cfg['n_layer'],
         bias = False
     )
-    args.mamba_args.dt_rank = args.latent_dim // 16
 
     # -- Model --
     from CausalLM import CausalLM

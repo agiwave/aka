@@ -22,19 +22,20 @@ if __name__ == "__main__":
         latent_dim = 768,
         dropout = 0.0,
         bias = False, # do we use bias inside LayerNorm and Linear layers?
-
-        layers = ['Attention', 'MLP']*6,
-        mlp_args = nn.Args(
-            kv_size = 768*4,
-            kv_gate = False,
-        ),
-        attn_args = nn.Args(
-            window_size = 256,
-            num_heads = 12,
-            num_kv_groups = 12,
-            rotary_embedding = True,
-        ),
-
+        layers = [
+            nn.Args(
+                name = 'Attention',
+                window_size = 256,
+                num_heads = 12,
+                num_kv_groups = 12,
+                rotary_embedding = True,
+            ), 
+            nn.Args(
+                name = 'MLP',
+                kv_size = 768*4,
+                kv_gate = False,
+            )
+        ]*6,
         # -- Train args --
         lr = 6e-4, # max learning rate
         batch_size = 12, # if gradient_accumulation_steps > 1, this is the micro-batch size

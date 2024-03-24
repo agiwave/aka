@@ -69,31 +69,32 @@ def PredictionBlock(args):
     return __init__(nn.Module(forward=forward), args)
 
 def PredictionArgs(name):
+
     args = nn.Args(
         vocab_size = 256000,
         vocab_dim = 32,
         latent_dim = 384,
-        layers = ['Attention', 'MLP']*8,
-        attn_args = nn.Args(
-            windows_size = 128,  # Limit Attention Seq Length to 256. Gemma2b --> 8192
-            num_heads = 8,
-            num_kv_groups = 8,
-            rotary_embedding = True
-        ),
-        pred_args = nn.Args(
-            qk_dim = 64,
-            kv_size = 384 * 3,
-            kv_gate = False,
-            feat_dim = 64,
-            kernel_size = 4
-        ),
         dropout = 0.1,
         bias = False, # bias in Linear?
     )
+    attn_args = nn.Args(
+        name = 'Attention',
+        windows_size = 128,  # Limit Attention Seq Length to 256. Gemma2b --> 8192
+        num_heads = 8,
+        num_kv_groups = 8,
+        rotary_embedding = True
+    )
+    pred_args = nn.Args(
+        name = 'Prediction',
+        qk_dim = 64,
+        kv_size = 384 * 3,
+        kv_gate = False,
+        feat_dim = 64,
+        kernel_size = 4
+    )
     match name:
         case 'base':
-            args.layers = ['Attention', 'Prediction']*6
-
+            args.layers = [attn_args, pred_args]*6
         case _:
             assert False, f"Unknown Block name{name}"
     return args

@@ -71,31 +71,29 @@ def SSMBlock(args):
     return __init__(nn.Module(forward=forward), args)
 
 def SSMArgs(name):
-    args = Args(
+    return Args(
         vocab_dim = 32,
         latent_dim = 384,
-        layers = ['SSM', 'MLP']*8,
-        mlp_args = Args(
-            qk_dim = 64,
-            kv_size = 384 * 3,
-            kv_gate = False,
-        ),
-        attn_args = Args(
-            windows_size = 64,  # Limit Attention Seq Length to 256. Gemma2b --> 8192
-            qk_dim = 384,
-            num_heads = 8,
-            num_kv_groups = 8,
-            rotary_embedding = True,
-            num_states = 64
-        ),
+        layers = [
+            Args(
+                name = 'SSM',
+                windows_size = 64,  # Limit Attention Seq Length to 256. Gemma2b --> 8192
+                qk_dim = 384,
+                num_heads = 8,
+                num_kv_groups = 8,
+                rotary_embedding = True,
+                num_states = 64
+            ), 
+            Args(
+                name = 'MLP',
+                qk_dim = 64,
+                kv_size = 384 * 3,
+                kv_gate = False,
+            )
+        ]*8,
         dropout = 0.1,
         bias = False, # bias in Linear?
     )
-    match name:
-        case 'Base':
-            args.layers = ['SSM', 'MLP']*6
-        case _:
-            assert False, f"Unknown SSM name{name}"
     return args
 
 if __name__ == "__main__":

@@ -15,7 +15,7 @@ def CFFNBlock(args):
         dropout = getattr(args, 'dropout', 0.2)
 
         # -- Attention Args
-        args = args.mlp_args
+        # args = args.mlp_args
         self.latent_dim = latent_dim
         self.qk_dim = getattr(args, 'qk_dim', latent_dim)
         self.kv_size = getattr(args, 'kv_size', latent_dim)
@@ -61,42 +61,45 @@ def CFFNBlock(args):
     return __init__(nn.Module(forward=forward), args)
 
 def CFFNArgs(name):
-    args = nn.Args(
+    cffn_args = nn.Args(
+        name = 'CFFN',
+        conv_size = 4,
+        kv_size = 384 * 3,
+        kv_gate = False,
+    )
+    attn_args = nn.Args(
+        name = 'Attention',
+        windows_size = 64,  # Limit Attention Seq Length to 256. Gemma2b --> 8192
+        num_heads = 8,
+        num_kv_groups = 8,
+        rotary_embedding = True
+    )
+    match name:
+        case 'base':
+            cffn_args.conv_size = 1
+        case 'conv4':
+            cffn_args.qk_dim = 384//4
+            cffn_args.conv_size = 4
+        case 'head4':
+            cffn_args.conv_size = 1
+            cffn_args.num_heads = 4
+        case 'convh4':
+            cffn_args.qk_dim = 384//4
+            cffn_args.conv_size = 4
+            cffn_args.num_heads = 4
+        case _:
+            assert False, f"Unknown name{name}"
+    return nn.Args(
         vocab_dim = 32,
         latent_dim = 384,
         resident_scale = True,
         dropout = 0.1,
         bias = False, # bias in Linear?
-        layers = ['Attention', 'CFFN']*8,
-        mlp_args = nn.Args(
-            conv_size = 4,
-            kv_size = 384 * 3,
-            kv_gate = False,
-        ),
-        attn_args = nn.Args(
-            windows_size = 64,  # Limit Attention Seq Length to 256. Gemma2b --> 8192
-            qk_dim = 384,
-            num_heads = 8,
-            num_kv_groups = 8,
-            rotary_embedding = True
-        )
+        layers = [
+            attn_args,
+            cffn_args
+        ]*8
     )
-    match name:
-        case 'base':
-            args.mlp_args.conv_size = 1
-        case 'conv4':
-            args.mlp_args.qk_dim = 384//4
-            args.mlp_args.conv_size = 4
-        case 'head4':
-            args.mlp_args.conv_size = 1
-            args.mlp_args.num_heads = 4
-        case 'convh4':
-            args.mlp_args.qk_dim = 384//4
-            args.mlp_args.conv_size = 4
-            args.mlp_args.num_heads = 4
-        case _:
-            assert False, f"Unknown name{name}"
-    return args
 
 if __name__ == "__main__":
     from RomeArena import TrainArena

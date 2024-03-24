@@ -38,7 +38,7 @@ def MLPBlock(args):
         bias = getattr(args,'bias', False)
 
         # -- MLP Args
-        args = args.mlp_args
+        # args = args.mlp_args
         kv_size = getattr(args, 'kv_size', latent_dim)
         kv_gate = getattr(args, 'kv_gate', False)
         qk_dim = getattr(args, 'qk_dim', None)
@@ -95,40 +95,43 @@ def MLPBlock(args):
 
 ########################### testing ##############################
 def MLPArgs(name):
-    args = nn.Args(
+    mlp_args = nn.Args(
+        name = 'MLP',
+        num_heads = 1,
+        kv_size = 384 * 3,
+        kv_gate = False,
+    )
+    match name:
+        case 'base':
+            mlp_args.num_heads = 1
+            mlp_args.kv_size = 384 * 3
+        case 'h4':
+            mlp_args.num_heads = 4
+            mlp_args.kv_size = 384 * 3
+        case 'h8':
+            mlp_args.num_heads = 8
+            mlp_args.kv_size = 384 * 3
+        case _:
+            assert False, f"Unknown name{name}"
+    return nn.Args(
         vocab_dim = 32,
         latent_dim = 384,
         resident_scale = True,
         dropout = 0.1,
         bias = False, # bias in Linear?
-        layers = ['Attention', 'MLP']*8,
-        mlp_args = nn.Args(
-            num_heads = 1,
-            kv_size = 384 * 3,
-            kv_gate = False,
-        ),
-        attn_args = nn.Args(
-            windows_size = 64,  # Limit Attention Seq Length to 256. Gemma2b --> 8192
-            qk_dim = 384,
-            num_heads = 8,
-            num_kv_groups = 8,
-            rotary_embedding = True,
-            num_states = 64
-        )
+        layers = [
+            nn.Args(
+                name = 'Attention',
+                windows_size = 64,  # Limit Attention Seq Length to 256. Gemma2b --> 8192
+                qk_dim = 384,
+                num_heads = 8,
+                num_kv_groups = 8,
+                rotary_embedding = True,
+                num_states = 64
+            ), 
+            mlp_args
+        ]*8,
     )
-    match name:
-        case 'base':
-            args.mlp_args.num_heads = 1
-            args.mlp_args.kv_size = 384 * 3
-        case 'h4':
-            args.mlp_args.num_heads = 4
-            args.mlp_args.kv_size = 384 * 3
-        case 'h8':
-            args.mlp_args.num_heads = 8
-            args.mlp_args.kv_size = 384 * 3
-        case _:
-            assert False, f"Unknown name{name}"
-    return args
 
 if __name__ == "__main__":
     from RomeArena import TrainArena

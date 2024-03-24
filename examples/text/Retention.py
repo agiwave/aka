@@ -139,24 +139,25 @@ def RetentionArgs(name):
     args = nn.Args(
         vocab_dim = 32,
         latent_dim = 384,
-        layers = ['Attention', 'MLP']*8,
-        mlp_args = nn.Args(
-            qk_dim = 64,
-            kv_size = 384 * 3,
-            kv_gate = False,
-        ),
-        attn_args = nn.Args(
-            num_heads = 8,
-            num_kv_groups = 8,
-            rotary_embedding = True,
-            window_size = 256,
-        ),
         dropout = 0.1,
         bias = False, # bias in Linear?
     )
+    mlp_args = nn.Args(
+        name = 'MLP',
+        qk_dim = 64,
+        kv_size = 384 * 3,
+        kv_gate = False,
+    ),
+    attn_args = nn.Args(
+        name = 'Retention',
+        num_heads = 8,
+        num_kv_groups = 8,
+        rotary_embedding = True,
+        window_size = 256,
+    ),
     match name:
         case 'Ret':
-            args.layers = ['Retention', 'MLP']*3
+            args.layers = [attn_args, mlp_args]*3
         case _:
             assert False, f"Unknown Ret name{name}"
     return args

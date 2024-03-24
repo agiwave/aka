@@ -8,4 +8,14 @@ from .Others import *
 
 class Args():
     def __init__(self, **kwargs): 
-        for key in kwargs: setattr(self, key, kwargs[key])
+        self.keys = [key for key in kwargs]
+        for key in kwargs: 
+            setattr(self, key, kwargs[key])
+    def cat(self, v):
+        args = {}
+        for key in self.keys:
+            args[key] = getattr(self, key)
+        for key in v.keys:
+            args[key] = getattr(v, key)
+        return Args(**args)
+

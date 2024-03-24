@@ -20,56 +20,60 @@ def GemmaArgs(name):
         def decode(self, s):
             return self.tokenizer.decode(s)
 
+    mlp_args = nn.Args(
+        name = "MLP",
+        kv_size = 0,
+        kv_gate = True,
+    )
+    attn_args = nn.Args(
+        name = 'Attention',
+        windows_size = 256,  # Limit Attention Seq Length to 256. Gemma2b --> 8192
+        num_heads = 8,
+        num_kv_groups = 1,
+        rotary_embedding = True,
+    )
     args = nn.Args(
         tokenizer = Tokenizer('data/Gemma/tokenizer.model'),
         vocab_size = 256000,
         latent_dim = 2048,
         prev_norm = 'gemma',
-        layers = ['AttentionKV', 'MLP']*18,
-        mlp_args = nn.Args(
-            kv_size = 0,
-            kv_gate = True,
-        ),
-        attn_args = nn.Args(
-            windows_size = 256,  # Limit Attention Seq Length to 256. Gemma2b --> 8192
-            num_heads = 8,
-            num_kv_groups = 1,
-            rotary_embedding = True,
-        ),
+        layers = [attn_args, mlp_args]*18,
         dropout = 0.0,
         bias = False, # bias in Linear?
     )
     match name:
         case '2b':
-            args.layers = ['Attention', 'MLP']*18
             args.latent_dim = 2048
-            args.attn_args.num_heads = 8
-            args.attn_args.num_kv_groups = 1
-            args.mlp_args.kv_size = 16384
+            attn_args.num_heads = 8
+            attn_args.num_kv_groups = 1
+            mlp_args.kv_size = 16384
+            args.layers = [attn_args, mlp_args]*18
         case '8b':
-            args.layers = ['Attention', 'MLP']*28
+            n_layers = 28
             args.latent_dim = 3072
-            args.attn_args.num_heads = 16
-            args.attn_args.num_kv_groups = 16
-            args.mlp_args.kv_size = 24576
+            attn_args.num_heads = 16
+            attn_args.num_kv_groups = 16
+            mlp_args.kv_size = 24576
+            args.layers = [attn_args, mlp_args]*28
         case '20m':
-            args.layers = ['Attention', 'MLP']*10
+            n_layers = 10
             args.latent_dim = 384
-            args.attn_args.num_heads = 6
-            args.attn_args.num_kv_groups = 6
-            args.attn_args.window_size = 256
-            args.mlp_args.kv_size = 1024
+            attn_args.num_heads = 6
+            attn_args.num_kv_groups = 6
+            attn_args.window_size = 256
+            mlp_args.kv_size = 1024
+            args.layers = [attn_args, mlp_args]*10
         case '70m':
-            args.layers = ['Attention', 'MLP']*20
+            n_layers = 20
             args.latent_dim = 512
-            args.attn_args.num_heads = 8
-            args.attn_args.num_kv_groups = 8
-            args.attn_args.window_size = 256
-            args.mlp_args.kv_size = 512*3
+            attn_args.num_heads = 8
+            attn_args.num_kv_groups = 8
+            attn_args.window_size = 256
+            mlp_args.kv_size = 512*3
+            args.layers = [attn_args, mlp_args]*20
         case _:
             assert False, f"Unknown Gemma name{name}"
     return args
-
 
 def Gemma(name, ckpt=None):
     from CausalLM import CausalLM

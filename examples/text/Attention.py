@@ -28,7 +28,7 @@ def AttentionBlock(args):
         dropout = getattr(args, 'dropout', 0.2)
 
         # -- Attention Args
-        args = args.attn_args
+        # args = args.attn_args
         attn_qk_dim = getattr(args, 'qk_dim', latent_dim)
         attn_hidden_dim = getattr(args, 'hidden_dim', latent_dim)
         attn_heads = getattr(args, 'num_heads', 1)
@@ -137,13 +137,11 @@ def AttentionBlock(args):
 if __name__ == "__main__":
     atten = AttentionBlock(nn.Args(
         latent_dim = 384,
-        attn_args = nn.Args(
-            window_size = 128,
-            hidden_dim = 256,
-            qk_dim = 384,
-            num_heads = 8,
-            num_kv_groups = 2,
-        )
+        window_size = 128,
+        hidden_dim = 256,
+        qk_dim = 384,
+        num_heads = 8,
+        num_kv_groups = 2
     ))
     input = np.randn(50, 100, 384)
     output = atten(input)

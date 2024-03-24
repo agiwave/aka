@@ -14,16 +14,18 @@ def LLaMA(name):
         latent_dim = 4096,
         rotary_embedding = True,
         lm_head = True,
-
-        layers = ['Attention', 'MLP']*32,
-        attn_args = nn.Args(
-            num_heads = 8,
-            num_kv_groups = 1
-        ),
-        mlp_args = nn.Args(
-            kv_size = 4096*4,   # ???
-            kv_gate = True,
-        ),
+        layers = [
+            nn.Args(
+                name = 'Attention',
+                num_heads = 8,
+                num_kv_groups = 1
+            ), 
+            nn.Args(
+                name = 'MLP',
+                kv_size = 4096*4,   # ???
+                kv_gate = True,
+            )
+        ]*32,
         dropout = 0.2,
         bias = False,
         rope_theta = 10000,

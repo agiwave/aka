@@ -10,7 +10,19 @@ if __name__ == "__main__":
         'data/wiki/wiki.txt',
         'data/shakespeare/train.txt'
     ])
-
+    mlp_args = nn.Args(
+        name = 'MLP',
+        qk_dim = 64,
+        kv_size = 384*4,
+        kv_gate = True,
+    )
+    attn_args = nn.Args(
+        name = 'Attention',
+        window_size = 256,
+        num_heads = 6,
+        num_kv_groups = 6,
+        rotary_embedding = True,
+    )
     args = nn.Args(
         tokenizer = tokenizer,
         vocab_size = 50304,
@@ -20,18 +32,7 @@ if __name__ == "__main__":
         bias = False, # do we use bias inside LayerNorm and Linear layers?
 
         # -- Layer args --
-        layers = ['Attention', 'MLP']*12,
-        mlp_args = nn.Args(
-            qk_dim = 64,
-            kv_size = 384*4,
-            kv_gate = True,
-        ),
-        attn_args = nn.Args(
-            window_size = 256,
-            num_heads = 6,
-            num_kv_groups = 6,
-            rotary_embedding = True,
-        ),
+        layers = [attn_args, mlp_args]*12,
 
         # -- Train args --
         lr = 6e-4,

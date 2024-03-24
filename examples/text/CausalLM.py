@@ -62,7 +62,7 @@ def CausalLM(args):
         self.pad_x = pad_x
         self.embedding_scale = (None if not embedding_scale else math.sqrt(vocab_dim))
         self.embedding = nn.Embedding(num_embeddings=args.vocab_size, embedding_dim=vocab_dim)
-        self.layers = nn.ModuleList([make_layer(key, args) for key in args.layers])
+        self.layers = nn.ModuleList([make_layer(layer.name, args.cat(layer)) for layer in args.layers])
         self.in_proj = in_proj
         self.out_proj = out_proj
         self.lm_head = None if not lm_head else nn.Linear(vocab_dim, args.vocab_size,bias=False)
@@ -189,7 +189,22 @@ def CausalLM(args):
     return __init__(nn.Module(forward = forward, generate = generate, generator=generator),args)
 
 def CausalLMArgs(name):
-    args = nn.Args(
+    mlp_args = nn.Args(
+        name = 'MLP',
+        kv_size = 384*4,
+        kv_gate = True,
+        qk_dim = 384,
+        hidden_dim = 384
+    )
+    attn_args = nn.Args(
+        name = 'Attention',
+        qk_dim = 384,
+        hidden_dim = 384,
+        num_heads = 6,
+        num_kv_groups = 6,
+        rotary_embedding = True,
+    )
+    return nn.Args(
         vocab_size = 50304,
         vocab_dim = 64,
         block_size = 256,
@@ -198,23 +213,8 @@ def CausalLMArgs(name):
         post_sum_scale = False,
         dropout = 0.2,
         bias = False, # do we use bias inside LayerNorm and Linear layers?
-
-        layers = ['Attention', 'MLP']*6,
-        mlp_args = nn.Args(
-            kv_size = 384*4,
-            kv_gate = True,
-            qk_dim = 384,
-            hidden_dim = 384
-        ),
-        attn_args = nn.Args(
-            qk_dim = 384,
-            hidden_dim = 384,
-            num_heads = 6,
-            num_kv_groups = 6,
-            rotary_embedding = True,
-        )
+        layers = [attn_args, mlp_args]*6,
     )
-    return args
 
 if __name__ == "__main__":
     from RomeArena import TrainArena, RunArena
