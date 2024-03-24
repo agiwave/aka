@@ -17,7 +17,7 @@ def AFTFullBlock(args):
         '''
         latent_dim = args.latent_dim
         # -- Attention Args
-        args = args.attn_args
+        # args = args.attn_args
         attn_qk_dim = getattr(args, 'qk_dim', latent_dim)
         window_size = getattr(args, 'window_size', 1024)
 
@@ -68,7 +68,7 @@ def AFTSimple(args):
         Number of Heads is 1 as done in the paper.
         '''
         latent_dim = args.latent_dim
-        args = args.attn_args
+        # args = args.attn_args
         attn_qk_dim = getattr(args, 'qk_dim', latent_dim)
         attn_window_size = getattr(args, 'window_size', 256)
 

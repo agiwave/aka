@@ -20,7 +20,7 @@ def RomeSetArgs(name):
         latent_dim = 384,
         layers = [attn_args, mlp_args]*8,
         post_sum_scale = False,
-        resident_scale = False,
+        resident_scale = True,
         dropout = 0.1,
         bias = False, # bias in Linear?
     )
@@ -73,10 +73,10 @@ if __name__ == "__main__":
         'RomeSet-vsbase',
         'RomeSet-vsvocabFull',
         'RomeSet-vsqk_dim',
-        'RomeSet-vsvocab16',          # 200321 - (-4)
         'RomeSet-vskv_gate',
         'RomeSet-vsAFT',
         'RomeSet-vsRet',
+        # 'RomeSet-vsvocab16',          # 200321 - (-4)
         # 'RomeSet-vsresident_scale',   # add score a little bit
         # 'RomeSet-vssum_scale',        # 200321 - (-1)
         # 'RomeSet-vsTopk',             # 200321 - (-2)
@@ -88,5 +88,5 @@ if __name__ == "__main__":
         # 'RomeSet-Ret15m',
         # 'RomeSet-Gemma15mNOV',
     ]
-    # TrainArena(roles, nn.Args(lr = 6e-3, epochs=3))
-    RunArena(roles, 'My lord Sebastian')
+    TrainArena(roles, nn.Args(lr = 6e-3, epochs=3))
+    # RunArena(roles, 'My lord Sebastian')

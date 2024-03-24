@@ -3,7 +3,6 @@ import aka.numpy as np
 
 def RetentionBlock(args):
     def __init__(self,args):
-        use_bias=args.bias
         self.embed_dim = args.latent_dim
         self.value_dim = getattr(args, 'hidden_dim', args.latent_dim)
         self.num_heads = args.num_heads
@@ -13,11 +12,11 @@ def RetentionBlock(args):
         self.gate_fn = np.silu
         self.window_size = None
 
-        self.q_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=use_bias)
-        self.k_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=use_bias)
-        self.v_proj = nn.Linear(self.embed_dim, self.value_dim, bias=use_bias)
-        self.g_proj = nn.Linear(self.embed_dim, self.value_dim, bias=use_bias)
-        self.out_proj = nn.Linear(self.value_dim, self.embed_dim, bias=use_bias)
+        self.q_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=args.bias)
+        self.k_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=args.bias)
+        self.v_proj = nn.Linear(self.embed_dim, self.value_dim, bias=args.bias)
+        self.g_proj = nn.Linear(self.embed_dim, self.value_dim, bias=args.bias)
+        self.out_proj = nn.Linear(self.value_dim, self.embed_dim, bias=args.bias)
         self.group_norm = nn.RMSNorm(self.head_dim)
         return self
 
