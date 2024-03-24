@@ -71,24 +71,24 @@ def MLPBlock(args):
     def forward(self, x, **kwargs):
         x = x if self.in_proj is None else self.in_proj(x)
         if self.num_heads == 1:
-            att = np.einsum('bld,md->blm', x, self.up_proj)
+            up = np.einsum('bld,md->blm', x, self.up_proj)
             if(self.gate_proj is not None):
                 gate = np.einsum('bld,md->blm', x, self.gate_proj)
                 gate = gate if self.act is None else self.act(gate)    # silu LLaMA ?
-                att = gate * att
+                up = gate * up
             elif self.act is not None:
-                att = self.act(att)
-            down = np.einsum('bld,md->blm', att, self.down_proj)
+                up = self.act(up)
+            down = np.einsum('bld,md->blm', up, self.down_proj)
         else:
             x = np.rearrange('b l (h d) -> b l h d', x, h=self.num_heads)
-            att = np.einsum('blhd,hmd->blhm', x, self.up_proj)
+            up = np.einsum('blhd,hmd->blhm', x, self.up_proj)
             if(self.gate_proj is not None):
                 gate = np.einsum('blhd,hmd->blhm', x, self.gate_proj)
                 gate = gate if self.act is None else self.act(gate)    # silu LLaMA ?
-                att = gate * att
+                up = gate * up
             elif self.act is not None:
-                att = self.act(att)
-            down = np.einsum('blhd,hmd->blhm', att, self.down_proj)
+                up = self.act(up)
+            down = np.einsum('blhd,hmd->blhm', up, self.down_proj)
             down = np.rearrange('b l h d -> b l (h d)', down)
         return down if self.out_proj is None else self.out_proj(down)
     return __init__(nn.Module(forward=forward), args)
@@ -98,6 +98,9 @@ def MLPArgs(name):
     args = nn.Args(
         vocab_dim = 32,
         latent_dim = 384,
+        resident_scale = True,
+        dropout = 0.1,
+        bias = False, # bias in Linear?
         layers = ['Attention', 'MLP']*8,
         mlp_args = nn.Args(
             num_heads = 1,
@@ -111,9 +114,7 @@ def MLPArgs(name):
             num_kv_groups = 8,
             rotary_embedding = True,
             num_states = 64
-        ),
-        dropout = 0.1,
-        bias = False, # bias in Linear?
+        )
     )
     match name:
         case 'base':
