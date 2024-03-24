@@ -4,10 +4,9 @@ import aka.numpy as np
 def RetentionBlock(args):
     def __init__(self,args):
         use_bias=args.bias
-        self.config = args.attn_args
         self.embed_dim = args.latent_dim
-        self.value_dim = getattr(args.attn_args, 'hidden_dim', args.latent_dim)
-        self.num_heads = args.attn_args.num_heads
+        self.value_dim = getattr(args, 'hidden_dim', args.latent_dim)
+        self.num_heads = args.num_heads
         self.head_dim = self.value_dim // self.num_heads
         self.key_dim = self.embed_dim // self.num_heads
         self.scaling = self.key_dim**-0.5
@@ -175,18 +174,21 @@ def RetNet(name):
         latent_dim = cfg['decoder_embed_dim'],
         lm_head = True,
         prev_norm = 'rms',
-        layers = ['Retention', 'MLP']*cfg['decoder_layers'],
-        mlp_args = Args(
-            kv_size = cfg['decoder_ffn_embed_dim'],
-            kv_gate = cfg['use_glu'],
-            activation = cfg['activation_fn']
-        ),
-        attn_args = Args(
-            num_heads = cfg['decoder_retention_heads'],
-            hidden_dim = cfg['decoder_value_embed_dim'],
-        ),
         bias = False,
-        dropout = cfg['dropout']
+        dropout = cfg['dropout'],
+        layers = [
+            nn.Args(
+                name = 'Retention',
+                num_heads = cfg['decoder_retention_heads'],
+                hidden_dim = cfg['decoder_value_embed_dim'],
+            ), 
+            nn.Args(
+                name = 'MLP',
+                kv_size = cfg['decoder_ffn_embed_dim'],
+                kv_gate = cfg['use_glu'],
+                activation = cfg['activation_fn']
+            )
+        ]*cfg['decoder_layers']
     )
 
     # -- Model --
