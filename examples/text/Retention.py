@@ -79,7 +79,7 @@ def RetentionBlock(args):
         #     state['cache_kv2'] = (k[:,1-window_size:].detach(), v[:,1-window_size:].detach())
 
         # -- rotary embedding --
-        q, k, v = [np.einsum('blnd->bnld', t) for t in [q, k, v]]
+        q, k, v = [np.rearrange('b l n d -> b n l d', t) for t in [q, k, v]]
         q = apply_rotary_emb(q, cache, pos=k.size(2)-T)
         k = apply_rotary_emb(k, cache)
 
@@ -100,32 +100,31 @@ def RetentionBlock(args):
 
             if state is not None:
                 # kv cache: [b, h, t, v_dim, qk_dim]
-                # What's this? :) This could not be S(n) = gamma * S(n-1) + K(n) @ V(n)
-                # This is just a approximation.
                 current_kv = k.unsqueeze(-2) * v.unsqueeze(-1)
                 intra_decay = decay_mask[:, :, -1, :, None, None]  # [b, h, t, 1, 1]
                 current_kv = (current_kv * intra_decay).sum(2)  # [b, h, v_dim, qk_dim]
-                state["prev_key_value"] = current_kv
-                state["scale"] = scale
+                state["prev_S"] = current_kv
+                state["prev_scale"] = scale
         else:
+            # bn1d, bn1d -> bndd
+            current_kv = k * v.transpose(-1, -2)
             decay = np.log(
                 1 - 2 ** (-5 - np.arange(self.num_heads, dtype=np.float))
-            ).view(1, -1, 1, 1).exp()
-            current_kv = k * v.transpose(-1, -2)
-            if "prev_kv" in state:
-                prev_kv = state["prev_kv"]
+            ).view(-1, 1, 1).exp()
+            if "prev_S" in state:
+                prev_S = state["prev_S"]
                 prev_scale = state["prev_scale"]
                 current_scale = prev_scale * decay + 1
-                decay_amount = prev_scale.sqrt() * decay / current_scale.sqrt()
-                prev_kv = prev_kv * decay_amount  # decay prev_kv
-                current_kv = current_kv / current_scale.sqrt()  # scale current_kv
-                current_kv = prev_kv + current_kv
+                gamma = prev_scale.sqrt() * decay / current_scale.sqrt()
+                current_S = prev_S * gamma + current_kv / current_scale.sqrt()
+                # kv = prev_S * decay.view(self.num_heads, 1, 1) + kv
             else:
+                current_S = current_kv
                 current_scale = np.ones_like(decay)
 
-            state["prev_kv"] = current_kv
+            state["prev_S"] = current_S
             state["prev_scale"] = current_scale
-            retention_out = np.sum(q * current_kv, dim=3).unsqueeze(1)  # (b, 1, h, d_v)
+            retention_out = np.sum(q * current_S, dim=3).unsqueeze(1)  # (b, 1, h, d_v)
 
         # norm
         normed = self.group_norm(retention_out).reshape(B, hidden_states.size(1), self.value_dim)
