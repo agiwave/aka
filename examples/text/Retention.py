@@ -76,10 +76,11 @@ def RetentionBlock(args):
         if state is not None:
             current_S = np.einsum('bhld,bhlv,bhl->bhvd', k, v, decay_mask[:, :, -1])
             if 'prev_S' in state:
-                # V = Q @ decay * S0
                 prev_S = state["prev_S"]       # ->[b, h, d, v]
                 decay = decay_mask[:, :, :, 0] # ->[b, h, t]
+                # S += S0 * (gamma ** n)
                 current_S += np.einsum('bhvd,bh->bhvd', prev_S, decay[:,:,-1])
+                # V += Q @ decay * S0
                 y += np.einsum('bhld,bhvd,bhl->blhv', q, prev_S, decay)
             state["prev_S"] = current_S.detach()
 
