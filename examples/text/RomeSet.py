@@ -43,6 +43,9 @@ def RomeSetArgs(name):
             attn_args.name = 'AFT'
         case 'vsRet':
             attn_args.name = 'Retention'
+        case 'vsRetlr':
+            attn_args.name = 'Retention'
+            attn_args.lr = True
         case 'vsTopk':
             mlp_args.activation = 'topk'
         case 'vsBias':
@@ -70,12 +73,13 @@ def RomeSetArgs(name):
 if __name__ == "__main__":
     from RomeArena import TrainArena, RunArena
     roles = [
-        'RomeSet-vsbase',
-        'RomeSet-vsvocabFull',
-        'RomeSet-vsqk_dim',
-        'RomeSet-vskv_gate',
-        'RomeSet-vsAFT',
+        # 'RomeSet-vsbase',
+        # 'RomeSet-vsvocabFull',
+        # 'RomeSet-vsqk_dim',
+        # 'RomeSet-vskv_gate',
+        # 'RomeSet-vsAFT',
         'RomeSet-vsRet',
+        # 'RomeSet-vsRetlr',
         # 'RomeSet-vsvocab16',          # 200321 - (-4)
         # 'RomeSet-vsresident_scale',   # add score a little bit
         # 'RomeSet-vssum_scale',        # 200321 - (-1)
@@ -88,5 +92,5 @@ if __name__ == "__main__":
         # 'RomeSet-Ret15m',
         # 'RomeSet-Gemma15mNOV',
     ]
-    TrainArena(roles, nn.Args(lr = 6e-3, epochs=3))
+    TrainArena(roles, nn.Args(lr = 6e-3, epochs=2))
     # RunArena(roles, 'My lord Sebastian')

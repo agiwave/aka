@@ -9,7 +9,7 @@ def SSMBlock(args):
     def __init__(self, args):
         latent_dim = args.latent_dim
         bias = getattr(args, 'bias', False)
-        args = args.attn_args
+        # args = args.attn_args
 
         hidden_dim = getattr(args, 'hidden_dim', latent_dim)
         self.hidden_dim = hidden_dim
@@ -71,11 +71,11 @@ def SSMBlock(args):
     return __init__(nn.Module(forward=forward), args)
 
 def SSMArgs(name):
-    return Args(
+    return nn.Args(
         vocab_dim = 32,
         latent_dim = 384,
         layers = [
-            Args(
+            nn.Args(
                 name = 'SSM',
                 windows_size = 64,  # Limit Attention Seq Length to 256. Gemma2b --> 8192
                 qk_dim = 384,
@@ -84,9 +84,8 @@ def SSMArgs(name):
                 rotary_embedding = True,
                 num_states = 64
             ), 
-            Args(
+            nn.Args(
                 name = 'MLP',
-                qk_dim = 64,
                 kv_size = 384 * 3,
                 kv_gate = False,
             )
@@ -101,4 +100,4 @@ if __name__ == "__main__":
     TrainArena([
         # 'Gemma-20m', 
         'SSM-Base',
-    ], Args(lr = 6e-4, epochs=4))
+    ], nn.Args(lr = 6e-4, epochs=4))

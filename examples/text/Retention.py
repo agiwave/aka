@@ -10,7 +10,6 @@ def RetentionBlock(args):
         self.key_dim = self.embed_dim // self.num_heads
         self.scaling = self.key_dim**-0.5
         self.gate_fn = np.silu
-        self.window_size = None
 
         self.q_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=args.bias)
         self.k_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=args.bias)
@@ -18,30 +17,27 @@ def RetentionBlock(args):
         self.g_proj = nn.Linear(self.embed_dim, self.value_dim, bias=args.bias)
         self.out_proj = nn.Linear(self.value_dim, self.embed_dim, bias=args.bias)
         self.group_norm = nn.RMSNorm(self.head_dim)
+        self.decay = nn.Parameter(
+            data=np.log(1 - 2 ** (-5 - np.arange(self.num_heads, dtype=np.float))),
+            requires_grad=getattr(args,'lr',False)
+        )
         return self
 
-    def compute_mask(qlen, klen, latent_dim, num_heads):
-        # Multi-Scale for diff heads.
-        decay = np.log(
-            1 - 2 ** (-5 - np.arange(num_heads, dtype=np.float))
-        )
-        index = np.arange(klen).to(decay)
-        mask = np.tril(np.ones(qlen, klen), diagonal=klen-qlen).to(decay)
-        mask = np.masked_fill(
-            index[-qlen:, None] - index[None, :], ~mask.bool(), float("inf")
-        )
-        mask = np.exp(mask * decay[:, None, None])
-        mask = np.nan_to_num(mask)
-        mask = mask.unsqueeze(0)  # [1, h, t, t]
-        mask = mask / mask.sum(dim=-1, keepdim=True).sqrt()
-
-        # scaling
-        mask = np.nan_to_num(mask, nan=0.0)
-
-        # decay_scale (used for kv cache)
-        scale = decay.exp().view(-1, 1) ** index.view(1, -1)  # [h, t]
-        scale = scale.sum(-1).view(1, -1, 1, 1)  # [b, h, 1, 1]
-        return (mask, scale)
+    def compute_mask(decay, qlen, klen, num_heads):
+        if qlen == 1:
+            return np.exp(decay)[None, :, None, None]
+        else:
+            index = np.arange(klen).to(decay)
+            mask = np.tril(np.ones(qlen, klen), diagonal=klen-qlen).to(decay)
+            mask = np.masked_fill(
+                index[-qlen:, None] - index[None, :], ~mask.bool(), float("inf")
+            )
+            mask = np.exp(mask * decay[:, None, None])
+            mask = np.nan_to_num(mask)
+            mask = mask.unsqueeze(0)  # [1, h, t, t]
+            mask = mask / mask.sum(dim=-1, keepdim=True).sqrt()
+            mask = np.nan_to_num(mask, nan=0.0)
+            return mask
 
     def apply_rotary_emb(x, cache, pos=0):
         _,_,L,D = x.shape
@@ -67,67 +63,28 @@ def RetentionBlock(args):
         q, k, v = [t.view(B, T, self.num_heads, -1) for t in [q,k,v]]
         k *= self.scaling
 
-        # -- append kv cache --
-        parallel = True if T > 1 else False
-        # parallel = True
-        # if state is not None:
-        #     window_size = self.window_size if self.window_size is not None else 128
-        #     if 'cache_kv2' in state:
-        #         cache_k, cache_v = state['cache_kv2']
-        #         k = np.cat((cache_k, k), dim=1)
-        #         v = np.cat((cache_v, v), dim=1)
-        #     state['cache_kv2'] = (k[:,1-window_size:].detach(), v[:,1-window_size:].detach())
-
         # -- rotary embedding --
         q, k, v = [np.rearrange('b l n d -> b n l d', t) for t in [q, k, v]]
-        q = apply_rotary_emb(q, cache, pos=k.size(2)-T)
+        q = apply_rotary_emb(q, cache)
         k = apply_rotary_emb(k, cache)
 
-        if parallel:
-            mask = cache.get('decay_mask', None)
-            if mask is None or mask[0].size(2) != q.size(2) or mask[0].size(3) != k.size(2):
-                mask = compute_mask(q.size(2), k.size(2), self.embed_dim, self.num_heads)
-                cache['decay_mask'] = mask
-            (decay_mask, scale) = mask
+        # -- qkv (Q @ K * D) @ V --
+        decay_mask = compute_mask(self.decay, q.size(2), k.size(2), self.num_heads)
+        y = np.einsum('bhld,bhmd,bhlm,bhmv->blhv', q, k, decay_mask, v)
 
-            # retention(q,k,v)
-            retention = np.einsum('bnld,bnmd->bnlm', q, k)
-            retention = retention * decay_mask 
-            retention = retention / retention.detach().abs().sum(
-                dim=-1, keepdim=True
-            ).clamp(min=1, max=5e4)
-            retention_out = np.einsum('bnlm,bnmd->blnd', retention, v)
-
-            if state is not None:
-                # kv cache: [b, h, t, v_dim, qk_dim]
-                current_kv = k.unsqueeze(-2) * v.unsqueeze(-1)
-                intra_decay = decay_mask[:, :, -1, :, None, None]  # [b, h, t, 1, 1]
-                current_kv = (current_kv * intra_decay).sum(2)  # [b, h, v_dim, qk_dim]
-                state["prev_S"] = current_kv
-                state["prev_scale"] = scale
-        else:
-            # bn1d, bn1d -> bndd
-            current_kv = k * v.transpose(-1, -2)
-            decay = np.log(
-                1 - 2 ** (-5 - np.arange(self.num_heads, dtype=np.float))
-            ).view(-1, 1, 1).exp()
-            if "prev_S" in state:
-                prev_S = state["prev_S"]
-                prev_scale = state["prev_scale"]
-                current_scale = prev_scale * decay + 1
-                gamma = prev_scale.sqrt() * decay / current_scale.sqrt()
-                current_S = prev_S * gamma + current_kv / current_scale.sqrt()
-                # kv = prev_S * decay.view(self.num_heads, 1, 1) + kv
-            else:
-                current_S = current_kv
-                current_scale = np.ones_like(decay)
-
-            state["prev_S"] = current_S
-            state["prev_scale"] = current_scale
-            retention_out = np.sum(q * current_S, dim=3).unsqueeze(1)  # (b, 1, h, d_v)
+        # -- state --
+        if state is not None:
+            current_S = np.einsum('bhld,bhlv,bhl->bhvd', k, v, decay_mask[:, :, -1])
+            if 'prev_S' in state:
+                # V = Q @ decay * S0
+                prev_S = state["prev_S"]       # ->[b, h, d, v]
+                decay = decay_mask[:, :, :, 0] # ->[b, h, t]
+                current_S += np.einsum('bhvd,bh->bhvd', prev_S, decay[:,:,-1])
+                y += np.einsum('bhld,bhvd,bhl->blhv', q, prev_S, decay)
+            state["prev_S"] = current_S.detach()
 
         # norm
-        normed = self.group_norm(retention_out).reshape(B, hidden_states.size(1), self.value_dim)
+        normed = self.group_norm(y).reshape(B, hidden_states.size(1), self.value_dim)
         out = self.gate_fn(g) * normed
         return self.out_proj(out)
     return __init__(nn.Module(forward=forward), args)
@@ -149,8 +106,7 @@ def RetentionArgs(name):
         name = 'Retention',
         num_heads = 8,
         num_kv_groups = 8,
-        rotary_embedding = True,
-        window_size = 256,
+        rotary_embedding = True
     ),
     match name:
         case 'Ret':

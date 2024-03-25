@@ -40,7 +40,7 @@ def MambaBlock(args):
             bias=mamba_args.conv_bias,
             kernel_size=mamba_args.conv_kernel_size,
             groups=mamba_args.qk_dim,
-            padding=mamba_args.conv_kernel_size-1,
+            padding=0,
         )
         # x_proj takes in `x` and outputs the input-specific Δ, B, C
         self.x_proj = nn.Linear(mamba_args.qk_dim, mamba_args.dt_rank + mamba_args.d_state * 2, bias=False)
@@ -65,20 +65,21 @@ def MambaBlock(args):
                 conv_state = np.zeros(b, self.args.qk_dim, n_conv_state, device=x.device)
                 ssm_state = np.zeros(b, self.args.qk_dim, self.args.d_state, device=x.device)
             x = np.cat((conv_state, x), dim=2)
-            y = self.conv1d(x)[:, :, n_conv_state:n_conv_state+l]
-            y = np.einsum('bdl->bld', y)
-            y = np.silu(y)
-            y, ssm_state = self.ssm(y, ssm_state)
-            state['ssm_state'] = ssm_state.detach()
-            state['conv_state'] = x[:, :, -n_conv_state:].detach()
         else:
             n_conv_state = 0
             ssm_state = np.zeros(b, self.args.qk_dim, self.args.d_state, device=x.device)
-            y = self.conv1d(x)[:, :, n_conv_state:n_conv_state+l]
-            y = np.einsum('bdl->bld', y)
-            y = np.silu(y)
-            y, ssm_state = self.ssm(y,ssm_state)
 
+        if x.size(2) < l + n_conv_state:
+            x = np.pad(x, (l + n_conv_state - x.size(2), 0), value=0.)
+        y = self.conv1d(x)
+        y = np.einsum('bdl->bld', y)
+        y = np.silu(y)
+        y, ssm_state = self.ssm(y,ssm_state)
+
+        if state is not None:
+            state['ssm_state'] = ssm_state.detach()
+            state['conv_state'] = x[:, :, -n_conv_state:].detach()
+            
         y = y * np.silu(gate)
         return self.out_proj(y)
 
