@@ -7,13 +7,15 @@ def RomeSetArgs(name):
         qk_dim = 384,
         kv_size = 384 * 3,
         kv_gate = False,
+        RWKV_Ver = None
     )
     attn_args = nn.Args(
         name = 'Attention',
         windows_size = 128,
         num_heads = 8,
         num_kv_groups = 8,
-        rotary_embedding = True
+        rotary_embedding = True,
+        conv_kernel_size = 4
     )
     args = nn.Args(
         vocab_dim = 32,
@@ -26,13 +28,11 @@ def RomeSetArgs(name):
     match name:
         case 'mamba':
             args.layers = [nn.Args(
-                name='Mamba',
-                qk_dim = 384,
-                dt_rank = 384//16,
-                conv_kernel_size = 4,
-                conv_bias = True,
-                d_state = 16
-            )]
+                name = 'Mamba',
+                num_heads = 8,
+                d_state = 1,
+                conv_kernel_size = 4
+            )]*len(args.layers)
         case 'vsbase':
             mlp_args.qk_dim = mlp_args.qk_dim
         case 'vsvocabFull':
@@ -45,6 +45,11 @@ def RomeSetArgs(name):
             mlp_args.kv_gate = True
         case 'vsresident_scale':
             args.resident_scale = True
+        case 'vsHawk':
+            attn_args.name = 'Hawk'
+        case 'vsHawkRWKVCMixer':
+            attn_args.name = 'Hawk'
+            mlp_args.name = 'RWKVCMixer'
         case 'vsAFT':
             attn_args.name = 'AFT'
         case 'vsRet':
@@ -52,6 +57,10 @@ def RomeSetArgs(name):
         case 'vsRetRWKVCMixer':
             attn_args.name = 'Retention'
             mlp_args.name = 'RWKVCMixer'
+        case 'vsRetRWKVCMixerV5':
+            attn_args.name = 'Retention'
+            mlp_args.name = 'RWKVCMixer'
+            mlp_args.RWKV_Ver = '5.0'
         case 'vsBaseRWKVCMixer':
             mlp_args.name = 'RWKVCMixer'
         case 'vsRetlr':
@@ -90,13 +99,16 @@ if __name__ == "__main__":
         # 'RomeSet-vsbase',
         # 'RomeSet-vsvocabFull',
         # 'RomeSet-vsqk_dim',
-        'RomeSet-vskv_gate',
+        # 'RomeSet-vskv_gate',
         # 'RomeSet-vsAFT',
-        'RomeSet-vsRetRWKVCMixer',
-        'RomeSet-vsBaseRWKVCMixer',
-        'RomeSet-vsRet',
-        'RomeSet-vsRetRKWV',
-        # 'RomeSet-mamba',
+        # 'RomeSet-vsHawk',
+        # 'RomeSet-vsHawkRWKVCMixer',
+        # 'RomeSet-vsRetRWKVCMixerV5',
+        # 'RomeSet-vsRetRWKVCMixer',
+        # 'RomeSet-vsBaseRWKVCMixer',
+        # 'RomeSet-vsRet',
+        # 'RomeSet-vsRetRKWV',
+        'RomeSet-mamba',
         # 'RomeSet-vsRetlr',
         # 'RomeSet-vsvocab16',          # 200321 - (-4)
         # 'RomeSet-vsresident_scale',   # add score a little bit
@@ -110,5 +122,5 @@ if __name__ == "__main__":
         # 'RomeSet-Ret15m',
         # 'RomeSet-Gemma15mNOV',
     ]
-    TrainArena(roles, nn.Args(lr = 6e-3, epochs=5))
+    TrainArena(roles, nn.Args(lr = 6e-3, epochs=1))
     # RunArena(roles, 'My lord Sebastian')

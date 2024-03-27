@@ -57,9 +57,9 @@ def RetentionBlock(args):
         y = np.stack((-x2, x1), dim=-1).flatten(-2)
         return (x * cos[pos:pos+L]) + (y * sin[pos:pos+L])
 
-    def forward(self, hidden_states, cache={}, state=None, **kwargs): 
-        B, T, H = hidden_states.size()
-        q, k, v, g = [proj(hidden_states) for proj in [self.q_proj, self.k_proj, self.v_proj, self.g_proj]]
+    def forward(self, x, cache={}, state=None, **kwargs): 
+        B, T, H = x.size()
+        q, k, v, g = [proj(x) for proj in [self.q_proj, self.k_proj, self.v_proj, self.g_proj]]
         q, k, v = [t.view(B, T, self.num_heads, -1) for t in [q,k,v]]
         k *= self.scaling
 
@@ -75,8 +75,8 @@ def RetentionBlock(args):
         # -- state --
         if state is not None:
             current_S = np.einsum('bhld,bhlv,bhl->bhvd', k, v, decay_mask[:, :, -1])
-            if 'prev_S' in state:
-                prev_S = state["prev_S"]       # ->[b, h, d, v]
+            prev_S = state.get('prev_S',None) # ->[b, h, d, v]
+            if prev_S is not None:
                 decay = decay_mask[:, :, :, 0] # ->[b, h, t]
                 # S += S0 * (gamma ** n)
                 current_S += np.einsum('bhvd,bh->bhvd', prev_S, decay[:,:,-1])
@@ -85,7 +85,7 @@ def RetentionBlock(args):
             state["prev_S"] = current_S.detach()
 
         # norm
-        normed = self.group_norm(y).reshape(B, hidden_states.size(1), self.value_dim)
+        normed = self.group_norm(y).reshape(B, x.size(1), self.value_dim)
         out = self.gate_fn(g) * normed
         return self.out_proj(out)
     return __init__(nn.Module(forward=forward), args)
