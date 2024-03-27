@@ -114,11 +114,15 @@ def MambaBlock(args):
         upA = np.where(mask==0, 1, upA)
         upA = np.cumprod(upA, dim=1) * mask
         s_and_bx = np.cat([ssm_state.unsqueeze(1), deltaBX[:,:l-1]], dim=1) # -> [B, L, H, D, N]
-        S = np.einsum('blmhn,bmhdn->blhdn', upA, s_and_bx) + deltaBX
-        ssm_state = S[:,-1]
-
-        S = np.rearrange('b l h d n-> b l (h d) n', S, h=num_heads)
-        y = np.einsum('bldn,bln->bld', S, C)
+        # One more einsum but avoid [blhdn]
+        ssm_state = np.einsum('bmhn,bmhdn->bhdn', upA[:,-1], s_and_bx) + deltaBX[:,-1]
+        y = np.einsum('blmhn,bmhdn,bln->blhd', upA, s_and_bx, C)
+        y += np.einsum('blhdn,bln->blhd', deltaBX, C)
+        y = np.rearrange('b l h d-> b l (h d)', y, h=num_heads)
+        # S = np.einsum('blmhn,bmhdn->blhdn', upA, s_and_bx) + deltaBX
+        # ssm_state = S[:,-1]
+        # S = np.rearrange('b l h d n-> b l (h d) n', S, h=num_heads)
+        # y = np.einsum('bldn,bln->bld', S, C)
         return y + x * D, ssm_state
 
     return __init__(nn.Module(forward = forward, ssm = ssm, selective_scan = selective_scan),args)

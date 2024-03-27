@@ -62,11 +62,11 @@ def HawkBlock(args):
         ix = np.sigmoid(self.i_gate(x)) * x
         ix = np.rearrange('b l (h d)->b l h d', ix, h=self.num_heads)
         bx = (1.0-a.unsqueeze(-1)) * ix # np.sqrt(1. - a.unsqueeze(-1)**2) * ix
-        h_and_ab = np.cat([gru_state, bx[:,:l-1]], dim=1)    # [B,L,H,D]
+        h_and_b = np.cat([gru_state, bx[:,:l-1]], dim=1)    # [B,L,H,D]
 
         # What's the diff between the two lines below?
         # y = np.sum(upA.unsqueeze(-1)*abx.unsqueeze(2), dim=2) + bx
-        y = np.einsum('blmh,blhd->blhd', upA, h_and_ab) + bx
+        y = np.einsum('blmh,blhd->blhd', upA, h_and_b) + bx
         if state is not None:
             state['conv_state'] = convx[:, :, -n_conv_state:].detach()
             state['gru_state'] = y[:,-1:].detach()
