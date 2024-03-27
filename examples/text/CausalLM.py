@@ -54,8 +54,6 @@ def CausalLM(args):
                     prev_norm = nn.RMSNorm(args.latent_dim)
 
         embedding_scale = getattr(args,'embedding_scale',False)
-        
-        self.post_sum_scale = (lambda x,d:x*(d**-0.5)) if getattr(args, 'post_sum_scale', False) else (lambda x,d:x) 
         self.tokenizer = args.tokenizer
         self.vocab_dim = vocab_dim
         self.latent_dim = args.latent_dim
@@ -80,7 +78,7 @@ def CausalLM(args):
             if self.pad_x:
                 x = np.pad(x, (self.latent_dim-self.vocab_dim,0), mode='constant', value=float(0.0))
             else:
-                x = self.post_sum_scale(self.in_proj(x), self.vocab_dim)
+                x = self.in_proj(x)
         if self.embedding_scale is not None:    # RetNet, nonsense :(. 
             x = x * self.embedding_scale
 
@@ -108,7 +106,7 @@ def CausalLM(args):
             if self.pad_x:
                 x = np.pad(x, (self.vocab_dim-self.latent_dim,0), mode='constant', value=float(0.0))
             else:
-                x = self.post_sum_scale(self.out_proj(x),self.latent_dim)
+                x = self.out_proj(x)
 
         # -- vocab_dim --> logits
         if self.lm_head is not None:
@@ -209,7 +207,6 @@ def CausalLMArgs(name):
         block_size = 256,
         latent_dim = 384,
 
-        post_sum_scale = False,
         dropout = 0.2,
         bias = False, # do we use bias inside LayerNorm and Linear layers?
         layers = [attn_args, mlp_args]*6,

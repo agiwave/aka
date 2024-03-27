@@ -124,13 +124,30 @@ def MambaBlock(args):
         deltaA = np.exp(np.einsum('bld,dn->bldn', delta, A))
         deltaBX = np.einsum('bld,bln,bld->bldn', delta, B, x)
 
-        # -- TODO, how to fast it in parallel? --
-        y_list = []
-        for i in range(l):
-            ssm_state = deltaA[:, i] * ssm_state + deltaBX[:, i]
-            y = np.einsum('bdn,bn->bd', ssm_state, C[:, i])
-            y_list.append(y)
-        y = np.stack(y_list, dim=1)
+        if False:
+            # Recurrently Ver
+            y_list = []
+            for i in range(l):
+                ssm_state = deltaA[:, i] * ssm_state + deltaBX[:, i]
+                y = np.einsum('bdn,bn->bd', ssm_state, C[:, i])
+                y_list.append(y)
+            y = np.stack(y_list, dim=1)
+        else:
+            # Parallel Version without CUDA, Warning: This ver will take O(b,l,l,d,n) Memories.
+            # 
+            # S(n) = a(1)*...a(n)*S(0) + a(2)*...*a(n)*bx(1) + a(3)*...*a(n)*bx(2) +...+ a(n)*bx(n-1) + b(n)
+            #
+            upA = deltaA.unsqueeze(2)
+            mask = np.tril(np.ones(l,l))
+            mask = mask[:,:,None,None].unsqueeze(0)
+            upA = np.where(mask==0, 1, upA)
+            upA = np.cumprod(upA, dim=1)
+            upA = np.where(mask==0, 0., upA)
+            sB = np.cat([ssm_state.unsqueeze(1), deltaBX[:,:l-1]], dim=1)
+            sumASB = np.sum(upA*sB.unsqueeze(1), dim=2)
+            S = sumASB + deltaBX
+            y = np.einsum('bldn,bln->bld', S, C)
+            ssm_state = S[:,-1]
         return y + x * D, ssm_state
 
     return __init__(nn.Module(forward = forward, ssm = ssm, selective_scan = selective_scan),args)
