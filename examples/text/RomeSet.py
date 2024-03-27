@@ -13,6 +13,7 @@ def RomeSetArgs(name):
         name = 'Attention',
         windows_size = 128,
         num_heads = 8,
+        d_state = 1,
         num_kv_groups = 8,
         rotary_embedding = True,
         conv_kernel_size = 4
@@ -33,6 +34,34 @@ def RomeSetArgs(name):
                 d_state = 1,
                 conv_kernel_size = 4
             )]*len(args.layers)
+        case 'mambamlp':
+            attn_args.name = 'Mamba'
+        case 'mambaret':
+            args.layers = [
+                nn.Args(
+                    name = 'Mamba',
+                    num_heads = 8,
+                    d_state = 1,
+                    conv_kernel_size = 4
+                ),
+                nn.Args(
+                    name = 'Retention',
+                    windows_size = 128,
+                    num_heads = 8,
+                    num_kv_groups = 8,
+                    rotary_embedding = True,
+                    conv_kernel_size = 4
+                )
+            ]*(len(args.layers)//2)
+        case 'mambaatt':
+            args.layers = [
+                nn.Args(
+                    name = 'Mamba',
+                    num_heads = 8,
+                    d_state = 1,
+                    conv_kernel_size = 4
+                ),attn_args
+            ]*(len(args.layers)//2)
         case 'vsbase':
             mlp_args.qk_dim = mlp_args.qk_dim
         case 'vsvocabFull':
@@ -57,10 +86,6 @@ def RomeSetArgs(name):
         case 'vsRetRWKVCMixer':
             attn_args.name = 'Retention'
             mlp_args.name = 'RWKVCMixer'
-        case 'vsRetRWKVCMixerV5':
-            attn_args.name = 'Retention'
-            mlp_args.name = 'RWKVCMixer'
-            mlp_args.RWKV_Ver = '5.0'
         case 'vsBaseRWKVCMixer':
             mlp_args.name = 'RWKVCMixer'
         case 'vsRetlr':
@@ -101,14 +126,16 @@ if __name__ == "__main__":
         # 'RomeSet-vsqk_dim',
         # 'RomeSet-vskv_gate',
         # 'RomeSet-vsAFT',
-        # 'RomeSet-vsHawk',
+        'RomeSet-vsHawk',
         # 'RomeSet-vsHawkRWKVCMixer',
-        # 'RomeSet-vsRetRWKVCMixerV5',
         # 'RomeSet-vsRetRWKVCMixer',
         # 'RomeSet-vsBaseRWKVCMixer',
         # 'RomeSet-vsRet',
         # 'RomeSet-vsRetRKWV',
-        'RomeSet-mamba',
+        # 'RomeSet-mamba',
+        # 'RomeSet-mambaatt',
+        # 'RomeSet-mambamlp',
+        # 'RomeSet-mambaret',
         # 'RomeSet-vsRetlr',
         # 'RomeSet-vsvocab16',          # 200321 - (-4)
         # 'RomeSet-vsresident_scale',   # add score a little bit

@@ -8,10 +8,10 @@ def MambaBlock(args):
         self.num_heads = getattr(args, 'num_heads', self.hidden_dim)
         self.dt_rank = getattr(args, 'dt_rank', args.latent_dim//16)
         self.conv_kernel_size = getattr(args, 'conv_kernel_size', 4)
-        self.d_state = getattr(args, 'd_state', 16)
+        self.d_state = getattr(args, 'd_state', 1)
 
-        A = np.repeat(np.arange(1, self.d_state + 1).unsqueeze(0), self.num_heads, 0)
-        # A = np.repeat(np.arange(1, self.num_heads + 1).unsqueeze(1), self.d_state, 0)
+        # A = np.repeat(np.arange(1, self.d_state + 1).unsqueeze(0), self.num_heads, 0)
+        A = np.repeat(np.arange(1, self.num_heads + 1).unsqueeze(1), self.d_state, 1)
         self.in_proj = nn.Linear(args.latent_dim, self.hidden_dim*2, bias=args.bias)
         self.conv1d = nn.Conv1d(
             in_channels=self.hidden_dim,

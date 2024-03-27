@@ -6,6 +6,13 @@ from .Shapes import *
 from .Activations import *
 from .Others import *
 
+
+def Dict(**kwargs):
+    return {k:v for k,v in kwargs.items()}
+def Object(**kwargs):
+    o = object()
+    [setattr(o,k,v) for k,v in kwargs.items()]
+    return o
 class Args():
     def __init__(self, **kwargs): 
         self.keys = [key for key in kwargs]

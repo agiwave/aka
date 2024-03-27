@@ -18,7 +18,7 @@ def HawkBlock(args):
             out_channels=self.hidden_dim,
             bias=args.bias,
             kernel_size=self.conv_kernel_size,
-            # groups=args.hidden_dim, # ？？？？？？？？？？？？
+            groups=self.hidden_dim, # ？？？？？？？？？？？？
             padding=0,
         )
         self.num_heads = getattr(args, 'num_heads', 1)
