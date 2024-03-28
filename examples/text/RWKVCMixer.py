@@ -3,13 +3,13 @@ import aka.nn as nn
 import aka.numpy as np
 
 def RWKVCMixerBlock(**kwargs):
-    match getattr(args,'RWKV_Ver', '6.0'):
+    match kwargs.get('RWKV_Ver', '6.0'):
         case '6.0':
-            return RWKV_CMix_x060(args)
+            return RWKV_CMix_x060(**kwargs)
         case '5.0':
-            return RWKV_CMix_x050(args)
+            return RWKV_CMix_x050(**kwargs)
         case _:
-            return RWKV_CMix_x060(args)
+            return RWKV_CMix_x060(**kwargs)
 
 def RWKV_CMix_x060(**kwargs):
     def __init__(self, **kwargs):

@@ -129,7 +129,7 @@ def RomeSetArgs(name):
 if __name__ == "__main__":
     from RomeArena import TrainArena, RunArena
     roles = [
-        'RomeSet-vsbase',
+        # 'RomeSet-vsbase',
         # 'RomeSet-vsvocabFull',
         # 'RomeSet-vsqk_dim',
         # 'RomeSet-vskv_gate',
@@ -139,14 +139,14 @@ if __name__ == "__main__":
         # 'RomeSet-vsHawkAtt',
         # 'RomeSet-vsSSM',
         # 'RomeSet-vsHawkRWKVCMixer',
-        # 'RomeSet-vsRetRWKVCMixer',
+        'RomeSet-vsRetRWKVCMixer',
         # 'RomeSet-vsBaseRWKVCMixer',
-        # 'RomeSet-vsRet',
+        'RomeSet-vsRet',
         # 'RomeSet-vsRetRKWV',
-        # 'RomeSet-vsMambaOnly',
-        # 'RomeSet-mambaatt',
-        # 'RomeSet-mambamlp',
-        # 'RomeSet-mambaret',
+        'RomeSet-vsMambaOnly',
+        'RomeSet-mambaatt',
+        'RomeSet-mambamlp',
+        'RomeSet-mambaret',
         # 'RomeSet-vsRetlr',
         # 'RomeSet-vsvocab16',          # 200321 - (-4)
         # 'RomeSet-vsresident_scale',   # add score a little bit
@@ -160,5 +160,5 @@ if __name__ == "__main__":
         # 'RomeSet-Ret15m',
         # 'RomeSet-Gemma15mNOV',
     ]
-    TrainArena(roles, lr = 6e-3, epochs=1)
+    TrainArena(roles, lr = 6e-3, epochs=5)
     # RunArena(roles, 'My lord Sebastian')

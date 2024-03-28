@@ -1,6 +1,5 @@
 import aka.nn as nn
 import aka.numpy as np
-from Curvefit import CurvefitBlock
 
 def HawkBlock(**kwargs):
     '''
@@ -23,7 +22,6 @@ def HawkBlock(**kwargs):
             groups=self.hidden_dim, # ？？？？？？？？？？？？
             padding=0,
         )
-        self.curvefit = CurvefitBlock(4, 'curve_cache')
         self.num_heads = getattr(args, 'num_heads', 1)
         self.r_gate = nn.Linear(self.hidden_dim, self.num_heads, bias=args.bias)
         self.i_gate = nn.Linear(self.hidden_dim, self.hidden_dim, bias=args.bias)
