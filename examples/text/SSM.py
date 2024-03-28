@@ -8,67 +8,75 @@ def SSMBlock(**kwargs):
     '''
     def __init__(self, **kwargs):
         args = nn.Object(**kwargs)
-        latent_dim = args.latent_dim
         bias = getattr(args, 'bias', False)
-        # args = args.attn_args
 
-        hidden_dim = getattr(args, 'hidden_dim', latent_dim)
-        self.hidden_dim = hidden_dim
+        self.hidden_dim = getattr(args, 'hidden_dim', args.latent_dim)
+        self.num_state = getattr(args, 'num_state', 16)
+        self.state_dim = getattr(args, 'state_dim', self.hidden_dim//self.num_state)
 
-        num_states = getattr(args, 'num_states', 64)
-        self.num_states = num_states
+        self.in_proj = nn.Linear(args.latent_dim, self.hidden_dim*2, bias=args.bias)
+        self.conv_kernel_size = getattr(args, 'conv_kernel_size', 4)
+        self.conv1d = nn.Conv1d(
+            in_channels=self.hidden_dim,
+            out_channels=self.hidden_dim,
+            bias=args.bias,
+            kernel_size=self.conv_kernel_size,
+            groups=self.hidden_dim, # ？？？？？？？？？？？？
+            padding=0,
+        )
+        self.out_proj = nn.Linear(self.hidden_dim, args.latent_dim, bias=bias)
+        self.dropout = nn.Dropout(getattr(args, 'dropout', 0.2))
 
-        self.in_proj = nn.Linear(latent_dim, hidden_dim, bias=bias)
-        self.out_proj = nn.Linear(hidden_dim, latent_dim, bias=bias)
-
-        window_size = getattr(args, 'window_size', 128)
-        self.window_size = window_size
-
-        self.A = nn.Parameter(shape=(num_states, num_states), initializer='xavier_uniform')
-        self.B = nn.Parameter(shape=(window_size, num_states), initializer='xavier_uniform')
-        self.C = nn.Parameter(shape=(hidden_dim, num_states), initializer='xavier_uniform')
-        self.D = nn.Parameter(np.ones(hidden_dim))
-        self.mask = np.tril(np.ones(window_size, window_size)).unsqueeze(-1)
-
-        dropout = getattr(args, 'dropout', 0.2)
-        self.resid_dropout = nn.Dropout(dropout)
+        self.A = nn.Parameter(np.arange(1, 1+self.num_state, dtype=np.float))
+        self.B = nn.Parameter(np.zeros(self.num_state, self.state_dim))
+        self.CN = nn.Parameter(shape=(self.num_state, self.hidden_dim), initializer='xavier_uniform')
+        self.CD = nn.Parameter(shape=(self.state_dim, self.hidden_dim), initializer='xavier_uniform')
+        self.D = nn.Parameter(np.zeros(self.hidden_dim))
+        self.ON = nn.Parameter(shape=(self.hidden_dim, self.num_state), initializer='xavier_uniform')
+        self.OD = nn.Parameter(shape=(self.hidden_dim, self.state_dim), initializer='xavier_uniform')
         return self
 
-    def ssm_state_v(A,B,h,x):
-        return np.einsum('mn,bnd->bmd', A, h) + np.einsum('ln,bld->bnd', B, x)
-    def ssm(A,B,C,h,x,mask):
-        x = x*mask
-        h = ssm_state_v(A,B,h,x*mask)
-        return np.einsum('dn,bnd->bd', C, h)
-    vmap_ssm = np.vmap(ssm, in_dims=(None,None,None,None,None,0), out_dims=(1))
-
     def forward(self, inputs, *, state=None, **kwargs):
-        outputs = None
-        window_size = self.window_size
-        (hidden_dim, num_states) = self.hidden_dim, self.num_states
-        while inputs is not None:
-            B, L, D = inputs.shape
-            if L > window_size:
-                (x, inputs) = inputs.split([window_size, L-window_size], dim=1)
-                L = window_size
+        x = inputs
+        (b, l, d) = x.shape
+        (x, gate) = self.in_proj(x).chunk(2, dim=-1)
+        
+        convx = np.rearrange('b l d->b d l',x)
+        if state is not None:
+            n_conv_state = self.conv_kernel_size-1
+            if 'conv_state' in state:
+                ssm_state = state['ssm_state']
+                convx = np.cat((state['conv_state'], convx), dim=2)
             else:
-                (x, inputs) = inputs, None
-            
-            ssmA, ssmB, ssmC, ssmD = self.A, self.B, self.C, self.D
-            if state is not None:
-                ssm_state = state.get('ssm_state', None)
-                if ssm_state is None:
-                    ssm_state = np.zeros((B,num_states,D))
-                y = vmap_ssm(ssmA, ssmB, ssmC, ssm_state, x, self.mask[:L,:L])
-                y = y + ssmD * x
-                ssm_state = ssm_state_v(ssmA, ssmB, ssm_state, x)
-                state['ssm_state']=ssm_state.detach()
-            else:
-                ssm_state = np.zeros((B,num_states,D))
-                y = vmap_ssm(ssmA, ssmB, ssmC, ssm_state,x,self.mask[:L,:L])
-                y = y + ssmD * x
-            outputs = y if outputs is None else np.cat([outputs, y], dim=1)
-        return self.resid_dropout(self.out_proj(outputs))
+                ssm_state = np.zeros(b, 1, self.num_state, self.state_dim, device=x.device)
+        else:
+            n_conv_state = 0
+            ssm_state = np.zeros(b, 1, self.num_state, self.state_dim, device=x.device)
+
+        if convx.size(2) < l + n_conv_state:
+            convx = np.pad(convx, (l + n_conv_state - convx.size(2), 0), value=0.)
+        x = self.conv1d(convx)
+        x = np.silu(x)
+        x = np.rearrange('b d l->b l d',x)
+
+        O = np.einsum('vh,vd->vhd', self.ON,self.OD)
+        C = np.einsum('hv,dv->hdv', self.CN,self.CD)
+        logA = -np.softplus(self.A + np.einsum('vhd,hdv->h', O, C))
+        mask = np.tril(np.ones(l,l,device=x.device))  # [L,L] 
+        logA = np.einsum('h,lm->hlm',logA,mask)
+        cumA = np.exp(np.cumsum(logA, dim=1))
+
+        sumB = self.B + np.einsum('vhd,blv->blhd', O, x-self.D)
+        shiftB = np.cat([ssm_state, sumB[:,:l-1]], dim=1)
+
+        y = np.einsum('hlm,bmhd,hdv->blv',cumA, shiftB, C)
+        y += np.einsum('blhd,hdv->blv', sumB, C) + self.D
+        if state is not None:
+            state['conv_state'] = convx[:, :, -n_conv_state:].detach()
+            state['ssm_state'] = (np.einsum('hlm,bmhd->blhd',cumA[:,-1:], shiftB) + sumB[:,-1:]).detach()
+
+        y = y * np.gelu(gate)
+        return self.dropout(self.out_proj(y))
     return __init__(nn.Module(forward=forward), **kwargs)
 
 def SSMArgs(name):
@@ -83,7 +91,7 @@ def SSMArgs(name):
                 num_heads = 8,
                 num_kv_groups = 8,
                 rotary_embedding = True,
-                num_states = 64
+                num_state = 64
             ), 
             dict(
                 name = 'MLP',

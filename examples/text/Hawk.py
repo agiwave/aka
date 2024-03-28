@@ -1,11 +1,12 @@
 import aka.nn as nn
 import aka.numpy as np
+from Curvefit import CurvefitBlock
 
 def HawkBlock(**kwargs):
     '''
     Paper: Graffin & Hawk
     Changes to paper:
-        1, Add num_heads to gater than paper. The orginal paper is element-wise RG_GRU (num_heads==D)
+        1, Add num_heads to RG_LRU. The orginal paper is element-wise RG_LRU (num_heads==D)
         2, Add silu after conv.
         3, beta = 1 - alpha. The orginal paper is beta = sqrt(1-alpha**2)
     '''
@@ -22,6 +23,7 @@ def HawkBlock(**kwargs):
             groups=self.hidden_dim, # ？？？？？？？？？？？？
             padding=0,
         )
+        self.curvefit = CurvefitBlock(4, 'curve_cache')
         self.num_heads = getattr(args, 'num_heads', 1)
         self.r_gate = nn.Linear(self.hidden_dim, self.num_heads, bias=args.bias)
         self.i_gate = nn.Linear(self.hidden_dim, self.hidden_dim, bias=args.bias)
@@ -37,11 +39,12 @@ def HawkBlock(**kwargs):
         convx = np.rearrange('b l d->b d l',x)
         if state is not None:
             n_conv_state = self.conv_kernel_size-1
-            if 'conv_state' in state:
+            if 'gru_state' in state:
                 gru_state = state['gru_state']
                 convx = np.cat((state['conv_state'], convx), dim=2)
             else:
                 gru_state = np.zeros(b, 1, self.num_heads, self.hidden_dim//self.num_heads, device=x.device)
+            state['conv_state'] = convx[:, :, -n_conv_state:].detach()
         else:
             n_conv_state = 0
             gru_state = np.zeros(b, 1, self.num_heads, self.hidden_dim//self.num_heads, device=x.device)
@@ -54,7 +57,6 @@ def HawkBlock(**kwargs):
 
         r = np.sigmoid(self.r_gate(x))
         a = np.exp((self.c * np.softplus(self.delta)) * r)    # [B,L,H]
-
         mask = np.tril(np.ones(l,l,device=x.device)).unsqueeze(-1)  # [  L,L,1]
         upA = a.unsqueeze(2)                        # [B,L,H]   -> [B,L,1,H]
         upA = np.where(mask==0, 1., upA)            # [B,L,1,H] -> [B,L,L,H]
@@ -64,12 +66,8 @@ def HawkBlock(**kwargs):
         ix = np.rearrange('b l (h d)->b l h d', ix, h=self.num_heads)
         bx = (1.0-a.unsqueeze(-1)) * ix # np.sqrt(1. - a.unsqueeze(-1)**2) * ix
         h_and_b = np.cat([gru_state, bx[:,:l-1]], dim=1)    # [B,L,H,D]
-
-        # What's the diff between the two lines below?
-        # y = np.sum(upA.unsqueeze(-1)*abx.unsqueeze(2), dim=2) + bx
         y = np.einsum('blmh,blhd->blhd', upA, h_and_b) + bx
         if state is not None:
-            state['conv_state'] = convx[:, :, -n_conv_state:].detach()
             state['gru_state'] = y[:,-1:].detach()
         y = np.rearrange('b l h d->b l (h d)',y)
         y = y * np.gelu(gate)

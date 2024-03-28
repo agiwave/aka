@@ -92,7 +92,7 @@ def CFFNArgs(name):
     return nn.Object(
         vocab_dim = 32,
         latent_dim = 384,
-        resident_scale = True,
+        resident_gate = True,
         dropout = 0.1,
         bias = False, # bias in Linear?
         layers = [

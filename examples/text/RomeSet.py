@@ -22,12 +22,12 @@ def RomeSetArgs(name):
         vocab_dim = 32,
         latent_dim = 384,
         layers = [attn_args, mlp_args]*8,
-        resident_scale = True,
+        resident_gate = True,
         dropout = 0.1,
         bias = False, # bias in Linear?
     )
     match name:
-        case 'mamba':
+        case 'vsMambaOnly':
             args['layers'] = [dict(
                 name = 'Mamba',
                 num_heads = 8,
@@ -73,9 +73,14 @@ def RomeSetArgs(name):
         case 'vskv_gate':
             mlp_args['kv_gate'] = True
         case 'vsresident_scale':
-            args['resident_scale'] = True
+            args['resident_gate'] = True
         case 'vsHawk':
             attn_args['name'] = 'Hawk'
+        case 'vsHawkOnly':
+            attn_args['name'] = 'Hawk'
+            args['layers'] = [attn_args]*len(args['layers'])
+        case 'vsSSM':
+            attn_args['name'] = 'SSM'
         case 'vsHawkRWKVCMixer':
             attn_args['name'] = 'Hawk'
             mlp_args['name'] = 'RWKVCMixer'
@@ -124,18 +129,21 @@ def RomeSetArgs(name):
 if __name__ == "__main__":
     from RomeArena import TrainArena, RunArena
     roles = [
-        # 'RomeSet-vsbase',
+        'RomeSet-vsbase',
         # 'RomeSet-vsvocabFull',
         # 'RomeSet-vsqk_dim',
         # 'RomeSet-vskv_gate',
         # 'RomeSet-vsAFT',
         # 'RomeSet-vsHawk',
+        # 'RomeSet-vsHawkOnly',       # TOP 1
+        # 'RomeSet-vsHawkAtt',
+        # 'RomeSet-vsSSM',
         # 'RomeSet-vsHawkRWKVCMixer',
         # 'RomeSet-vsRetRWKVCMixer',
         # 'RomeSet-vsBaseRWKVCMixer',
         # 'RomeSet-vsRet',
         # 'RomeSet-vsRetRKWV',
-        'RomeSet-mamba',
+        # 'RomeSet-vsMambaOnly',
         # 'RomeSet-mambaatt',
         # 'RomeSet-mambamlp',
         # 'RomeSet-mambaret',

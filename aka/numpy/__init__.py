@@ -110,6 +110,8 @@ def cross_entropy(input, target, weight=None, size_average=None, ignore_index=-1
 def topk(input, k, dim=None, largest=True, sorted=True): return boot.invoke()
 def multinomial(input, num_samples, replacement=False, *, generator=None): return boot.invoke()
 
+def conv1d(input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1): return boot.invoke()
+
 def device(device): return boot.invoke()
 def set_default_dtype(d): return boot.invoke()
 def load(f, *, weights_only=False, mmap=None):return boot.invoke()
