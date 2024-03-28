@@ -183,4 +183,4 @@ if __name__ == "__main__":
     # TrainArena([
     #     # 'Gemma-20m', 
     #     'Retention-Ret',
-    # ], Args(lr = 6e-4, epochs=4))
+    # ], lr = 6e-4, epochs=4)

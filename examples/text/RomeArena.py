@@ -7,7 +7,7 @@ import aka.nn as nn
 import aka.repo as repo
 import aka.data
 
-def TrainArena(roles, train_args):
+def TrainArena(roles, lr=1.e-4, epochs=1):
     # -- Tokenizer --
     tokenizer = repo.AutoTokenizer('data/mamba-370m-hf')
     # class Tokenizer:
@@ -57,10 +57,10 @@ def TrainArena(roles, train_args):
             CausalLM(**role.args), 
             data_loader=dataloader,
             optimizer="Adam",
-            optimizer_kwargs={'lr':train_args['lr']},
+            optimizer_kwargs={'lr':lr},
             forward_kwargs={'state':{}},
             persist_filename = role.persist_filename,
-            epochs=train_args['epochs'])
+            epochs=epochs)
 
     # -- Plot --
     m_losses = [train(r) for r in roles]
@@ -115,5 +115,4 @@ if __name__ == "__main__":
         # 'RomeSet-vbdimpad',
         # 'RomeSet-vbdim',
         # 'RomeSet-novbdim',
-        ], nn.Object(lr = 6e-4, epochs=1)
-    )
+    ], lr = 6e-4, epochs=1)

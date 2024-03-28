@@ -108,4 +108,4 @@ if __name__ == "__main__":
         # 'CFFN-head4',
         # 'CFFN-convh4',
         'CFFN-base'
-    ], dict(lr = 6e-4, epochs=5))
+    ], lr = 6e-4, epochs=5)

@@ -99,7 +99,7 @@ if __name__ == "__main__":
     from RomeArena import TrainArena, RunArena
     TrainArena([
         'Prediction-base'
-    ], dict(lr = 6e-4, epochs=3))
+    ], lr = 6e-4, epochs=3)
 
     # RunArena([
     #     'Prediction-base'

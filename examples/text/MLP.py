@@ -139,4 +139,4 @@ if __name__ == "__main__":
         'MLP-h4',
         'MLP-h8',
         'MLP-base'
-    ], dict(lr = 6e-4, epochs=1))
+    ], lr = 6e-4, epochs=1)

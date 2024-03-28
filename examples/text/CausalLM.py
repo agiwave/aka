@@ -187,14 +187,14 @@ def CausalLM(**kwargs):
     return __init__(nn.Module(forward = forward, generate = generate, generator=generator),**kwargs)
 
 def CausalLMArgs(name):
-    mlp_args = nn.Object(
+    mlp_args = dict(
         name = 'MLP',
         kv_size = 384*4,
         kv_gate = True,
         qk_dim = 384,
         hidden_dim = 384
     )
-    attn_args = nn.Object(
+    attn_args = dict(
         name = 'Attention',
         qk_dim = 384,
         hidden_dim = 384,
@@ -202,7 +202,7 @@ def CausalLMArgs(name):
         num_kv_groups = 6,
         rotary_embedding = True,
     )
-    return nn.Object(
+    return dict(
         vocab_size = 50304,
         vocab_dim = 64,
         block_size = 256,
@@ -217,7 +217,7 @@ if __name__ == "__main__":
     from RomeArena import TrainArena, RunArena
     TrainArena([
         'CausalLM-demo'
-    ], dict(lr = 6e-4, epochs=3))
+    ], lr = 6e-4, epochs=3)
     # RunArena([
     #     'CausalLM-demo'
     # ], "Paul Daniels (born 4 June 1981 in Burlington)")

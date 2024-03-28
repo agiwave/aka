@@ -152,5 +152,5 @@ if __name__ == "__main__":
         # 'RomeSet-Ret15m',
         # 'RomeSet-Gemma15mNOV',
     ]
-    TrainArena(roles, dict(lr = 6e-3, epochs=1))
+    TrainArena(roles, lr = 6e-3, epochs=1)
     # RunArena(roles, 'My lord Sebastian')
