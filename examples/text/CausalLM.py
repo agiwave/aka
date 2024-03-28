@@ -29,11 +29,11 @@ def MetaLayer(**kwargs):
             return x + y, None
     return __init__(nn.Module(forward = forward), **kwargs)
 
-def CausalLM(args):
+def CausalLM(**kwargs):
     '''
     Causal Language Model.
     '''
-    def __init__(self, kwargs):
+    def __init__(self, **kwargs):
         args = nn.Object(**kwargs)
         in_proj, out_proj = None, None
         vocab_dim = getattr(args, 'vocab_dim', args.latent_dim)
@@ -184,7 +184,7 @@ def CausalLM(args):
             response += w
         return response
         
-    return __init__(nn.Module(forward = forward, generate = generate, generator=generator),args)
+    return __init__(nn.Module(forward = forward, generate = generate, generator=generator),**kwargs)
 
 def CausalLMArgs(name):
     mlp_args = nn.Object(

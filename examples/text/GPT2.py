@@ -48,7 +48,7 @@ if __name__ == "__main__":
                     batch_size=args.batch_size,
                     data_mapper=lambda x:x['text'])
 
-    model = CausalLM(args)
+    model = CausalLM(**args)
     nn.train(
         model,
         data_loader=dataloader,

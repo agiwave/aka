@@ -47,7 +47,7 @@ if __name__ == "__main__":
                     data_mapper=lambda x:x['text'])
 
     from CausalLM import CausalLM
-    model = CausalLM(args)
+    model = CausalLM(**args)
     nn.train(
         model,
         data_loader=dataloader,

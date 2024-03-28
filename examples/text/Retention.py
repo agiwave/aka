@@ -149,7 +149,7 @@ def RetNet(name):
 
     # -- Model --
     from CausalLM import CausalLM
-    m = CausalLM(args)
+    m = CausalLM(**args)
     if repo.exist(name, "model.safetensors"):
         with repo.fopen(name, "model.safetensors", ftype='safetensor') as f:
             keys = f.keys()

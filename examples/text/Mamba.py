@@ -154,7 +154,7 @@ def Mamba(name):
 
     # -- Model --
     from CausalLM import CausalLM
-    mamba = CausalLM(args)
+    mamba = CausalLM(**args)
     if repo.exist(name, "model.safetensors"):
         with repo.fopen(name, "model.safetensors", ftype='safetensor') as f:
             with np.no_grad():

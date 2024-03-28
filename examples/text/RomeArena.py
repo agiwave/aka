@@ -54,7 +54,7 @@ def TrainArena(roles, train_args):
     def train(role, **kwargs):
         from CausalLM import CausalLM
         return nn.train(
-            CausalLM(role.args), 
+            CausalLM(**role.args), 
             data_loader=dataloader,
             optimizer="Adam",
             optimizer_kwargs={'lr':train_args['lr']},
@@ -97,7 +97,7 @@ def RunArena(names, prompt):
     # -- Run --
     for role in roles:
         from CausalLM import CausalLM
-        model = CausalLM(role.args)
+        model = CausalLM(**role.args)
         nn.load_weights(model, role.persist_filename)
         print(role.name + ":")
         for w in model.generator(prompt):

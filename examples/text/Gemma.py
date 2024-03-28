@@ -77,7 +77,7 @@ def GemmaArgs(name):
 
 def Gemma(name, ckpt=None):
     from CausalLM import CausalLM
-    m = CausalLM(GemmaArgs(name))
+    m = CausalLM(**GemmaArgs(name))
     if ckpt is not None:
         state = np.load(
             ckpt, mmap=True, weights_only=True,
