@@ -1,7 +1,7 @@
 import aka.nn as nn
 import aka.numpy as np
 
-def PredictionBlock(args):
+def PredictionBlock(**kwargs):
     '''
         in ----> feat(B,L,feat_dim) --(conv)
              |                          |
@@ -12,7 +12,8 @@ def PredictionBlock(args):
              |-- v(B,L,hidden_dim) -------------|
                                                 |-- loss
     '''
-    def __init__(self,args):
+    def __init__(self,**kwargs):
+        args = nn.Object(**kwargs)
         latent_dim = args.latent_dim
         bias = getattr(args,'bias',False)
 
@@ -62,25 +63,24 @@ def PredictionBlock(args):
         else:
             return y
 
-    return __init__(nn.Module(forward=forward), args)
+    return __init__(nn.Module(forward=forward), **kwargs)
 
 def PredictionArgs(name):
-
-    args = nn.Object(
+    args = dict(
         vocab_size = 256000,
         vocab_dim = 32,
         latent_dim = 384,
         dropout = 0.1,
         bias = False, # bias in Linear?
     )
-    attn_args = nn.Object(
+    attn_args = dict(
         name = 'Attention',
         windows_size = 128,  # Limit Attention Seq Length to 256. Gemma2b --> 8192
         num_heads = 8,
         num_kv_groups = 8,
         rotary_embedding = True
     )
-    pred_args = nn.Object(
+    pred_args = dict(
         name = 'Prediction',
         qk_dim = 64,
         kv_size = 384 * 3,
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     from RomeArena import TrainArena, RunArena
     TrainArena([
         'Prediction-base'
-    ], nn.Object(lr = 6e-4, epochs=3))
+    ], dict(lr = 6e-4, epochs=3))
 
     # RunArena([
     #     'Prediction-base'

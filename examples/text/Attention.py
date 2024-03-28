@@ -8,7 +8,7 @@ except ImportError:
     memory_efficient_attention = None
     LowerTriangularFromBottomRightMask = None
 
-def AttentionBlock(args):
+def AttentionBlock(**kwargs):
     '''
     Group-Query Attention
     Args:
@@ -131,18 +131,18 @@ def AttentionBlock(args):
             y = np.einsum('bnlm,bmnd->blnd', att, v)
         y = y.reshape(B, L, self.hidden_dim)
         return self.resid_dropout(self.out_proj(y))
-    return __init__(nn.Module(forward=forward), args)
+    return __init__(nn.Module(forward=forward), nn.Object(**kwargs))
 
 # --- Example ---
 if __name__ == "__main__":
-    atten = AttentionBlock(nn.Object(
+    atten = AttentionBlock(
         latent_dim = 384,
         window_size = 128,
         hidden_dim = 256,
         qk_dim = 384,
         num_heads = 8,
         num_kv_groups = 2
-    ))
+    )
     input = np.randn(50, 100, 384)
     output = atten(input)
     print(output.size())

@@ -20,19 +20,19 @@ def GemmaArgs(name):
         def decode(self, s):
             return self.tokenizer.decode(s)
 
-    mlp_args = nn.Object(
+    mlp_args = dict(
         name = "MLP",
-        kv_size = 0,
+        kv_size= 0,
         kv_gate = True,
     )
-    attn_args = nn.Object(
+    attn_args = dict(
         name = 'Attention',
         windows_size = 256,  # Limit Attention Seq Length to 256. Gemma2b --> 8192
         num_heads = 8,
         num_kv_groups = 1,
         rotary_embedding = True,
     )
-    args = nn.Object(
+    args = dict(
         tokenizer = Tokenizer('data/Gemma/tokenizer.model'),
         vocab_size = 256000,
         latent_dim = 2048,
@@ -43,34 +43,34 @@ def GemmaArgs(name):
     )
     match name:
         case '2b':
-            args.latent_dim = 2048
-            attn_args.num_heads = 8
-            attn_args.num_kv_groups = 1
-            mlp_args.kv_size = 16384
-            args.layers = [attn_args, mlp_args]*18
+            args['latent_dim'] = 2048
+            attn_args['num_heads'] = 8
+            attn_args['num_kv_groups'] = 1
+            mlp_args.kv_size= 16384
+            args['layers'] = [attn_args, mlp_args]*18
         case '8b':
             n_layers = 28
-            args.latent_dim = 3072
-            attn_args.num_heads = 16
-            attn_args.num_kv_groups = 16
-            mlp_args.kv_size = 24576
-            args.layers = [attn_args, mlp_args]*28
+            args['latent_dim'] = 3072
+            attn_args['num_heads'] = 16
+            attn_args['num_kv_groups'] = 16
+            attn_args['kv_size']
+            args['layers'] = [attn_args, mlp_args]*28
         case '20m':
             n_layers = 10
-            args.latent_dim = 384
-            attn_args.num_heads = 6
-            attn_args.num_kv_groups = 6
+            args['latent_dim'] = 384
+            attn_args['num_heads'] = 6
+            attn_args['num_kv_groups'] = 6
             attn_args.window_size = 256
-            mlp_args.kv_size = 1024
-            args.layers = [attn_args, mlp_args]*10
+            mlp_args.kv_size= 1024
+            args['layers'] = [attn_args, mlp_args]*10
         case '70m':
             n_layers = 20
-            args.latent_dim = 512
-            attn_args.num_heads = 8
-            attn_args.num_kv_groups = 8
+            args['latent_dim'] = 512
+            attn_args['num_heads'] = 8
+            attn_args['num_kv_groups'] = 8
             attn_args.window_size = 256
-            mlp_args.kv_size = 512*3
-            args.layers = [attn_args, mlp_args]*20
+            mlp_args.kv_size= 512*3
+            args['layers'] = [attn_args, mlp_args]*20
         case _:
             assert False, f"Unknown Gemma name{name}"
     return args

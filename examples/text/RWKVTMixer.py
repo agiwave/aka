@@ -2,11 +2,12 @@
 import aka.nn as nn
 import aka.numpy as np
 
-def RWKVTMixerBlock(args):
-    return RWKV_Tmix_x060(args)
+def RWKVTMixerBlock(**kwargs):
+    return RWKV_Tmix_x060(**kwargs)
 
-def RWKV_Tmix_x060(args):
-    def __init__(self, args):
+def RWKV_Tmix_x060(**kwargs):
+    def __init__(self, **kwargs):
+        args = nn.Object(**kwargs)
         self.dim_att = getattr(args, 'dim_att', args.latent_dim)
         self.n_head = args.num_heads # dim_att // self.head_size
         assert self.dim_att % self.n_head == 0
@@ -127,4 +128,4 @@ def RWKV_Tmix_x060(args):
         x = np.reshape(x, (B * T, C))
         x = self.ln_x(x).view(B, T, C)
         return self.output(x * g)
-    return __init__(nn.Module(forward=forward), args)
+    return __init__(nn.Module(forward=forward), **kwargs)

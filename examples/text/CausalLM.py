@@ -2,20 +2,19 @@ import math
 import aka.nn as nn
 import aka.numpy as np
 
-def MetaLayer(name, args):
+def MetaLayer(**kwargs):
     '''
     Build resident meta layer by name. Include: GQA(Group-Query Attention), MLP, GateMLP, ...
     '''
-    def __init__(self, kwargs):
-        args = nn.Object(**kwargs)
+    def __init__(self, name, **kwargs):
         import importlib
         module = importlib.import_module(name)
         short_name = name.split('./\\')[-1]
         m = getattr(module, short_name+"Block", None)
         assert m is not None, f"Unknown layer:{name}"
-        self.norm = nn.RMSNorm(args.latent_dim)
-        self.layer = m(args)
-        self.scale = None if not getattr(args,'resident_scale',False) else nn.Parameter(np.ones(args.latent_dim))
+        self.norm = nn.RMSNorm(kwargs['latent_dim'])
+        self.layer = m(**kwargs)
+        self.scale = None if not kwargs.get('resident_scale',False) else nn.Parameter(np.ones(kwargs['latent_dim']))
         return self
 
     def forward(self, x, **kwargs):
@@ -28,7 +27,7 @@ def MetaLayer(name, args):
             return x + y, loss
         else:
             return x + y, None
-    return __init__(nn.Module(forward = forward),args)
+    return __init__(nn.Module(forward = forward), **kwargs)
 
 def CausalLM(args):
     '''
@@ -62,7 +61,7 @@ def CausalLM(args):
         self.pad_x = pad_x
         self.embedding_scale = (None if not embedding_scale else math.sqrt(vocab_dim))
         self.embedding = nn.Embedding(num_embeddings=args.vocab_size, embedding_dim=vocab_dim)
-        self.layers = nn.ModuleList([make_layer(layer['name'], dict(layer,**kwargs)) for layer in args.layers])
+        self.layers = nn.ModuleList([make_layer(**dict(layer,**kwargs)) for layer in args.layers])
         self.in_proj = in_proj
         self.out_proj = out_proj
         self.lm_head = None if not lm_head else nn.Linear(vocab_dim, args.vocab_size,bias=False)
@@ -218,7 +217,7 @@ if __name__ == "__main__":
     from RomeArena import TrainArena, RunArena
     TrainArena([
         'CausalLM-demo'
-    ], nn.Object(lr = 6e-4, epochs=3))
+    ], dict(lr = 6e-4, epochs=3))
     # RunArena([
     #     'CausalLM-demo'
     # ], "Paul Daniels (born 4 June 1981 in Burlington)")

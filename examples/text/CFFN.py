@@ -1,7 +1,7 @@
 import aka.nn as nn
 import aka.numpy as np
 
-def CFFNBlock(args):
+def CFFNBlock(**kwargs):
     '''
     CFFN - Conv-FFN
     Args:
@@ -58,7 +58,7 @@ def CFFNBlock(args):
         down = np.einsum('blhd,hdo->blho', up, self.down_proj)
         down = np.rearrange('b l h d -> b l (h d)', down)
         return down if self.out_proj is None else self.out_proj(down)
-    return __init__(nn.Module(forward=forward), args)
+    return __init__(nn.Module(forward=forward), nn.Object(**kwargs))
 
 def CFFNArgs(name):
     cffn_args = nn.Object(
@@ -108,4 +108,4 @@ if __name__ == "__main__":
         # 'CFFN-head4',
         # 'CFFN-convh4',
         'CFFN-base'
-    ], nn.Object(lr = 6e-4, epochs=5))
+    ], dict(lr = 6e-4, epochs=5))

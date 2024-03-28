@@ -3,10 +3,10 @@ import aka.nn as nn
 import aka.numpy as np
 from MLP import MLPBlock
 
-def MoeBlock(args):
+def MoeBlock(**kwargs):
     def forward(self, inputs):
         gate_logits = self.gate(inputs)
-        weights, selected_experts = np.topk(gate_logits, self.args.num_experts_per_tok)
+        weights, selected_experts = np.topk(gate_logits, self.num_experts_per_tok)
         weights = np.softmax(weights, dim=1, dtype=np.float).to(inputs.dtype)
         results = np.zeros_like(inputs)
         for i, expert in enumerate(self.experts):
@@ -17,7 +17,7 @@ def MoeBlock(args):
         return results
 
     return nn.Module(
-        experts = [MLPBlock(args) for _ in range(args.moe_args.num_experts)],
-        gate = nn.Linear(args.latent_dim, args.moe.num_experts, bias=False),
-        args = args.moe_args
+        experts = [MLPBlock(args) for _ in range(kwargs['num_experts'])],
+        gate = nn.Linear(kwargs['latent_dim'], kwargs['num_experts'], bias=False),
+        num_experts_per_tok = kwargs['num_experts_per_tok']
     )

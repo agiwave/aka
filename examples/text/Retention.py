@@ -1,8 +1,9 @@
 import aka.nn as nn
 import aka.numpy as np
 
-def RetentionBlock(args):
-    def __init__(self,args):
+def RetentionBlock(**kwargs):
+    def __init__(self,**kwargs):
+        args = nn.Object(**kwargs)
         self.embed_dim = args.latent_dim
         self.value_dim = getattr(args, 'hidden_dim', args.latent_dim)
         self.num_heads = args.num_heads
@@ -88,7 +89,7 @@ def RetentionBlock(args):
         normed = self.group_norm(y).reshape(B, x.size(1), self.value_dim)
         out = self.gate_fn(g) * normed
         return self.out_proj(out)
-    return __init__(nn.Module(forward=forward), args)
+    return __init__(nn.Module(forward=forward), **kwargs)
 
 def RetentionArgs(name):
     args = nn.Object(

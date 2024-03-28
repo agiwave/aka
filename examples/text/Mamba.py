@@ -1,9 +1,10 @@
 import aka.nn as nn
 import aka.numpy as np
 
-def MambaBlock(args):
+def MambaBlock(**kwargs):
     """A single Mamba block, as described in Figure 3 in Section 3.4 in the Mamba paper [1]."""
-    def __init__(self, args):
+    def __init__(self, **kwargs):
+        args = nn.Object(**kwargs)
         self.hidden_dim = getattr(args, 'hidden_dim', args.latent_dim)
         self.num_heads = getattr(args, 'num_heads', self.hidden_dim)
         self.dt_rank = getattr(args, 'dt_rank', args.latent_dim//16)
@@ -125,7 +126,7 @@ def MambaBlock(args):
         # y = np.einsum('bldn,bln->bld', S, C)
         return y + x * D, ssm_state
 
-    return __init__(nn.Module(forward = forward, ssm = ssm, selective_scan = selective_scan),args)
+    return __init__(nn.Module(forward = forward, ssm = ssm, selective_scan = selective_scan), **kwargs)
             
 def Mamba(name):
     import aka.repo as repo
@@ -133,12 +134,12 @@ def Mamba(name):
     # -- Tokenizer --
     tokenizer = repo.AutoTokenizer(name)
     cfg = repo.fopen(name, 'config.json', ftype='json')
-    args = nn.Object(
+    args = dict(
         tokenizer = tokenizer,
         vocab_size = cfg['vocab_size'],
         latent_dim = cfg['d_model'],
         layers = [
-            nn.Object(
+            dict(
                 name = 'Mamba',
                 hidden_dim = cfg['intermediate_size'],
                 num_heads = cfg['intermediate_size'],

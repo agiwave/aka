@@ -2,12 +2,13 @@
 import aka.nn as nn
 import aka.numpy as np
 
-def AFTBlock(args):
-    return AFTFullBlock(args)
+def AFTBlock(**kwargs):
+    return AFTFullBlock(**kwargs)
 
 # https://blog.csdn.net/wizardforcel/article/details/132206172
-def AFTFullBlock(args):
-    def __init__(self, args):
+def AFTFullBlock(**kwargs):
+    def __init__(self, **kwargs):
+        args = nn.Object(**kwargs)
         '''
         max_seqlen: the maximum number of timesteps (sequence length) to be fed in
         dim: the embedding dimension of the tokens
@@ -56,7 +57,7 @@ def AFTFullBlock(args):
         Yt = self.project(Yt)
         return Yt
 
-    return __init__(nn.Module(forward=forward), args)
+    return __init__(nn.Module(forward=forward), **kwargs)
 
 def AFTSimple(args):
     def __init__(self, args):
@@ -99,7 +100,7 @@ def AFTSimple(args):
         Yt = self.project(Yt)
         return Yt
 
-    return __init__(nn.Module(forward=forward), args)
+    return __init__(nn.Module(forward=forward), nn.Object(**kwargs))
 
 def AFTLocal(args):
     def __init__(self, args):
@@ -155,10 +156,10 @@ def AFTLocal(args):
         Yt = self.project(Yt)
         return Yt
 
-    return __init__(nn.Module(forward=forward), args)
+    return __init__(nn.Module(forward=forward), nn.Object(**kwargs))
 
 if __name__ == "__main__":
     from RomeArena import TrainArena
     TrainArena([
         'RomeSet-AFT15m'
-    ], nn.Object(lr = 6e-4, epochs=3))
+    ], dict(lr = 6e-4, epochs=3))

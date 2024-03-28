@@ -1,7 +1,7 @@
 import aka.nn as nn
 import aka.numpy as np
 
-def HawkBlock(args):
+def HawkBlock(**kwargs):
     '''
     Paper: Graffin & Hawk
     Changes to paper:
@@ -9,7 +9,8 @@ def HawkBlock(args):
         2, Add silu after conv.
         3, beta = 1 - alpha. The orginal paper is beta = sqrt(1-alpha**2)
     '''
-    def __init__(self, args):
+    def __init__(self, **kwargs):
+        args = nn.Object(**kwargs)
         self.hidden_dim = getattr(args, 'hidden_dim', args.latent_dim)
         self.in_proj = nn.Linear(args.latent_dim, self.hidden_dim*2, bias=args.bias)
         self.conv_kernel_size = getattr(args, 'conv_kernel_size', 4)
@@ -73,5 +74,5 @@ def HawkBlock(args):
         y = np.rearrange('b l h d->b l (h d)',y)
         y = y * np.gelu(gate)
         return self.out_proj(y)
-    return __init__(nn.Module(forward = forward),args)
+    return __init__(nn.Module(forward = forward),**kwargs)
 

@@ -11,7 +11,7 @@ def Topk(n_topk, *, dim=-1):
         return np.softmax(x, dim=dim)
     return nn.Module(forward=forward, n_topk=n_topk, dim=dim)
 
-def MLPBlock(args):
+def MLPBlock(**kwargs):
     '''
     Reference: Gemma, LLaMA
     Common ver:
@@ -31,8 +31,8 @@ def MLPBlock(args):
     Examples:
         args.mlp_args,kv_gate == True ==> GateMLP
     '''
-    def __init__(self, args):
-        
+    def __init__(self, **kwargs):
+        args = nn.Object(**kwargs)
         # -- Global Args --
         latent_dim = args.latent_dim
         bias = getattr(args,'bias', False)
@@ -91,11 +91,11 @@ def MLPBlock(args):
             down = np.einsum('blhd,hmd->blhm', up, self.down_proj)
             down = np.rearrange('b l h d -> b l (h d)', down)
         return down if self.out_proj is None else self.out_proj(down)
-    return __init__(nn.Module(forward=forward), args)
+    return __init__(nn.Module(forward=forward), **kwargs)
 
 ########################### testing ##############################
 def MLPArgs(name):
-    mlp_args = nn.Object(
+    mlp_args = dict(
         name = 'MLP',
         num_heads = 1,
         kv_size = 384 * 3,
@@ -113,14 +113,14 @@ def MLPArgs(name):
             mlp_args.kv_size = 384 * 3
         case _:
             assert False, f"Unknown name{name}"
-    return nn.Object(
+    return dict(
         vocab_dim = 32,
         latent_dim = 384,
         resident_scale = True,
         dropout = 0.1,
         bias = False, # bias in Linear?
         layers = [
-            nn.Object(
+            dict(
                 name = 'Attention',
                 windows_size = 64,  # Limit Attention Seq Length to 256. Gemma2b --> 8192
                 qk_dim = 384,
@@ -139,4 +139,4 @@ if __name__ == "__main__":
         'MLP-h4',
         'MLP-h8',
         'MLP-base'
-    ], nn.Object(lr = 6e-4, epochs=1))
+    ], dict(lr = 6e-4, epochs=1))

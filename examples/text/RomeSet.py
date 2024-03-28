@@ -65,7 +65,7 @@ def RomeSetArgs(name):
         case 'vsbase':
             mlp_args['qk_dim'] = mlp_args['qk_dim']
         case 'vsvocabFull':
-            args['vocab_dim'] = args.latent_dim
+            args['vocab_dim'] = args['latent_dim']
         case 'vsvocab16':
             args['vocab_dim'] = 16
         case 'vsqk_dim':
@@ -129,13 +129,13 @@ if __name__ == "__main__":
         # 'RomeSet-vsqk_dim',
         # 'RomeSet-vskv_gate',
         # 'RomeSet-vsAFT',
-        'RomeSet-vsHawk',
+        # 'RomeSet-vsHawk',
         # 'RomeSet-vsHawkRWKVCMixer',
         # 'RomeSet-vsRetRWKVCMixer',
         # 'RomeSet-vsBaseRWKVCMixer',
         # 'RomeSet-vsRet',
         # 'RomeSet-vsRetRKWV',
-        # 'RomeSet-mamba',
+        'RomeSet-mamba',
         # 'RomeSet-mambaatt',
         # 'RomeSet-mambamlp',
         # 'RomeSet-mambaret',
