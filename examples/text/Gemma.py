@@ -20,19 +20,19 @@ def GemmaArgs(name):
         def decode(self, s):
             return self.tokenizer.decode(s)
 
-    mlp_args = nn.Args(
+    mlp_args = nn.Object(
         name = "MLP",
         kv_size = 0,
         kv_gate = True,
     )
-    attn_args = nn.Args(
+    attn_args = nn.Object(
         name = 'Attention',
         windows_size = 256,  # Limit Attention Seq Length to 256. Gemma2b --> 8192
         num_heads = 8,
         num_kv_groups = 1,
         rotary_embedding = True,
     )
-    args = nn.Args(
+    args = nn.Object(
         tokenizer = Tokenizer('data/Gemma/tokenizer.model'),
         vocab_size = 256000,
         latent_dim = 2048,

@@ -166,7 +166,7 @@ if __name__ == "__main__":
             )
             return x,y
             
-    args = nn.Args(
+    args = nn.Object(
         vocab_size = 50304,
         block_size = 256, # context of up to 256 previous characters
 

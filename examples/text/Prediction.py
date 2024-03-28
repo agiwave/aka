@@ -66,21 +66,21 @@ def PredictionBlock(args):
 
 def PredictionArgs(name):
 
-    args = nn.Args(
+    args = nn.Object(
         vocab_size = 256000,
         vocab_dim = 32,
         latent_dim = 384,
         dropout = 0.1,
         bias = False, # bias in Linear?
     )
-    attn_args = nn.Args(
+    attn_args = nn.Object(
         name = 'Attention',
         windows_size = 128,  # Limit Attention Seq Length to 256. Gemma2b --> 8192
         num_heads = 8,
         num_kv_groups = 8,
         rotary_embedding = True
     )
-    pred_args = nn.Args(
+    pred_args = nn.Object(
         name = 'Prediction',
         qk_dim = 64,
         kv_size = 384 * 3,
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     from RomeArena import TrainArena, RunArena
     TrainArena([
         'Prediction-base'
-    ], nn.Args(lr = 6e-4, epochs=3))
+    ], nn.Object(lr = 6e-4, epochs=3))
 
     # RunArena([
     #     'Prediction-base'

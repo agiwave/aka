@@ -2,14 +2,14 @@ import aka.nn as nn
 import aka.numpy as np
 
 def RomeSetArgs(name):
-    mlp_args = nn.Args(
+    mlp_args = dict(
         name = 'MLP',
         qk_dim = 384,
         kv_size = 384 * 3,
         kv_gate = False,
         RWKV_Ver = None
     )
-    attn_args = nn.Args(
+    attn_args = dict(
         name = 'Attention',
         windows_size = 128,
         num_heads = 8,
@@ -18,7 +18,7 @@ def RomeSetArgs(name):
         rotary_embedding = True,
         conv_kernel_size = 4
     )
-    args = nn.Args(
+    args = dict(
         vocab_dim = 32,
         latent_dim = 384,
         layers = [attn_args, mlp_args]*8,
@@ -28,23 +28,23 @@ def RomeSetArgs(name):
     )
     match name:
         case 'mamba':
-            args.layers = [nn.Args(
+            args['layers'] = [dict(
                 name = 'Mamba',
                 num_heads = 8,
                 d_state = 1,
                 conv_kernel_size = 4
-            )]*len(args.layers)
+            )]*len(args['layers'])
         case 'mambamlp':
-            attn_args.name = 'Mamba'
+            attn_args['name'] = 'Mamba'
         case 'mambaret':
-            args.layers = [
-                nn.Args(
+            args['layers'] = [
+                dict(
                     name = 'Mamba',
                     num_heads = 8,
                     d_state = 1,
                     conv_kernel_size = 4
                 ),
-                nn.Args(
+                dict(
                     name = 'Retention',
                     windows_size = 128,
                     num_heads = 8,
@@ -52,68 +52,71 @@ def RomeSetArgs(name):
                     rotary_embedding = True,
                     conv_kernel_size = 4
                 )
-            ]*(len(args.layers)//2)
+            ]*(len(args['layers'])//2)
         case 'mambaatt':
-            args.layers = [
-                nn.Args(
+            args['layers'] = [
+                dict(
                     name = 'Mamba',
                     num_heads = 8,
                     d_state = 1,
                     conv_kernel_size = 4
                 ),attn_args
-            ]*(len(args.layers)//2)
+            ]*(len(args['layers'])//2)
         case 'vsbase':
-            mlp_args.qk_dim = mlp_args.qk_dim
+            mlp_args['qk_dim'] = mlp_args['qk_dim']
         case 'vsvocabFull':
-            args.vocab_dim = args.latent_dim
+            args['vocab_dim'] = args.latent_dim
         case 'vsvocab16':
-            args.vocab_dim = 16
+            args['vocab_dim'] = 16
         case 'vsqk_dim':
-            mlp_args.qk_dim = 64
+            mlp_args['qk_dim'] = 64
         case 'vskv_gate':
-            mlp_args.kv_gate = True
+            mlp_args['kv_gate'] = True
         case 'vsresident_scale':
-            args.resident_scale = True
+            args['resident_scale'] = True
         case 'vsHawk':
-            attn_args.name = 'Hawk'
+            attn_args['name'] = 'Hawk'
         case 'vsHawkRWKVCMixer':
-            attn_args.name = 'Hawk'
-            mlp_args.name = 'RWKVCMixer'
+            attn_args['name'] = 'Hawk'
+            mlp_args['name'] = 'RWKVCMixer'
         case 'vsAFT':
-            attn_args.name = 'AFT'
+            attn_args['name'] = 'AFT'
         case 'vsRet':
-            attn_args.name = 'Retention'
+            attn_args['name'] = 'Retention'
         case 'vsRetRWKVCMixer':
-            attn_args.name = 'Retention'
-            mlp_args.name = 'RWKVCMixer'
+            attn_args['name'] = 'Retention'
+            mlp_args['name'] = 'RWKVCMixer'
         case 'vsBaseRWKVCMixer':
-            mlp_args.name = 'RWKVCMixer'
+            mlp_args['name'] = 'RWKVCMixer'
         case 'vsRetlr':
-            attn_args.name = 'Retention'
+            attn_args['name'] = 'Retention'
             attn_args.lr = True
         case 'vsRetRKWV':
-            attn_args.name = 'RWKVTMixer'
-            mlp_args.name = 'RWKVCMixer'
+            attn_args['name'] = 'RWKVTMixer'
+            mlp_args['name'] = 'RWKVCMixer'
         case 'vsTopk':
-            mlp_args.activation = 'topk'
+            mlp_args['activation'] = 'topk'
         case 'vsBias':
             args.bias = True
         case 'Ret15m':
-            attn_args.name = 'Retention'
-            args.layers = [attn_args, mlp_args]*11
+            attn_args['name'] = 'Retention'
+            args['layers'] = [attn_args, mlp_args]*11
         case 'AFT15m':
-            attn_args.name = 'AFT'
-            args.layers = [attn_args, mlp_args]*12
+            attn_args['name'] = 'AFT'
+            args['layers'] = [attn_args, mlp_args]*12
         case 'Gemma15m':
-            args.layers = [attn_args, mlp_args]*12
+            args['layers'] = [attn_args, mlp_args]*12
         case '20m':
-            args.layers = [attn_args, mlp_args]*15
+            args['layers'] = [attn_args, mlp_args]*15
         case '70m':
-            args.layers = [attn_args, mlp_args]*30
-            args.latent_dim = 512
-            args.attn_args.num_heads = 8
-            args.attn_args.num_kv_groups = 8
-            mlp_args.kv_size = 512*3
+            args.update(dict(
+                layers = [attn_args, mlp_args]*30,
+                latent_dim = 512,
+                num_heads = 8,
+                num_kv_groups = 8,
+                kv_size = 512*3,
+            ))
+
         case _:
             assert False, f"Unknown Gemma name{name}"
     return args
@@ -149,5 +152,5 @@ if __name__ == "__main__":
         # 'RomeSet-Ret15m',
         # 'RomeSet-Gemma15mNOV',
     ]
-    TrainArena(roles, nn.Args(lr = 6e-3, epochs=1))
+    TrainArena(roles, dict(lr = 6e-3, epochs=1))
     # RunArena(roles, 'My lord Sebastian')

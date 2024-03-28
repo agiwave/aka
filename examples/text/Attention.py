@@ -135,7 +135,7 @@ def AttentionBlock(args):
 
 # --- Example ---
 if __name__ == "__main__":
-    atten = AttentionBlock(nn.Args(
+    atten = AttentionBlock(nn.Object(
         latent_dim = 384,
         window_size = 128,
         hidden_dim = 256,

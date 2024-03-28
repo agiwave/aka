@@ -10,20 +10,20 @@ if __name__ == "__main__":
         'data/wiki/wiki.txt',
         'data/shakespeare/train.txt'
     ])
-    mlp_args = nn.Args(
+    mlp_args = nn.Object(
         name = 'MLP',
         qk_dim = 64,
         kv_size = 384*4,
         kv_gate = True,
     )
-    attn_args = nn.Args(
+    attn_args = nn.Object(
         name = 'Attention',
         window_size = 256,
         num_heads = 6,
         num_kv_groups = 6,
         rotary_embedding = True,
     )
-    args = nn.Args(
+    args = nn.Object(
         tokenizer = tokenizer,
         vocab_size = 50304,
         vocab_dim = 64,

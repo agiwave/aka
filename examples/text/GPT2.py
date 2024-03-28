@@ -15,7 +15,7 @@ if __name__ == "__main__":
         'data/shakespeare/train.txt'
     ])
 
-    args = nn.Args(
+    args = nn.Object(
         tokenizer = tokenizer,
         vocab_size = 50257,
         vocab_dim = 64,
@@ -23,14 +23,14 @@ if __name__ == "__main__":
         dropout = 0.0,
         bias = False, # do we use bias inside LayerNorm and Linear layers?
         layers = [
-            nn.Args(
+            nn.Object(
                 name = 'Attention',
                 window_size = 256,
                 num_heads = 12,
                 num_kv_groups = 12,
                 rotary_embedding = True,
             ), 
-            nn.Args(
+            nn.Object(
                 name = 'MLP',
                 kv_size = 768*4,
                 kv_gate = False,

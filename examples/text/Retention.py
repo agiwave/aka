@@ -91,19 +91,19 @@ def RetentionBlock(args):
     return __init__(nn.Module(forward=forward), args)
 
 def RetentionArgs(name):
-    args = nn.Args(
+    args = nn.Object(
         vocab_dim = 32,
         latent_dim = 384,
         dropout = 0.1,
         bias = False, # bias in Linear?
     )
-    mlp_args = nn.Args(
+    mlp_args = nn.Object(
         name = 'MLP',
         qk_dim = 64,
         kv_size = 384 * 3,
         kv_gate = False,
     ),
-    attn_args = nn.Args(
+    attn_args = nn.Object(
         name = 'Retention',
         num_heads = 8,
         num_kv_groups = 8,
@@ -122,7 +122,7 @@ def RetNet(name):
     # -- Tokenizer --
     tokenizer = repo.AutoTokenizer(name)
     cfg = repo.fopen(name, 'config.json', ftype='json')
-    args = nn.Args(
+    args = nn.Object(
         tokenizer = tokenizer,
         vocab_size = cfg['vocab_size'],
         embedding_scale = True,
@@ -132,12 +132,12 @@ def RetNet(name):
         bias = False,
         dropout = cfg['dropout'],
         layers = [
-            nn.Args(
+            nn.Object(
                 name = 'Retention',
                 num_heads = cfg['decoder_retention_heads'],
                 hidden_dim = cfg['decoder_value_embed_dim'],
             ), 
-            nn.Args(
+            nn.Object(
                 name = 'MLP',
                 kv_size = cfg['decoder_ffn_embed_dim'],
                 kv_gate = cfg['use_glu'],

@@ -71,11 +71,11 @@ def SSMBlock(args):
     return __init__(nn.Module(forward=forward), args)
 
 def SSMArgs(name):
-    return nn.Args(
+    return nn.Object(
         vocab_dim = 32,
         latent_dim = 384,
         layers = [
-            nn.Args(
+            nn.Object(
                 name = 'SSM',
                 windows_size = 64,  # Limit Attention Seq Length to 256. Gemma2b --> 8192
                 qk_dim = 384,
@@ -84,7 +84,7 @@ def SSMArgs(name):
                 rotary_embedding = True,
                 num_states = 64
             ), 
-            nn.Args(
+            nn.Object(
                 name = 'MLP',
                 kv_size = 384 * 3,
                 kv_gate = False,
@@ -100,4 +100,4 @@ if __name__ == "__main__":
     TrainArena([
         # 'Gemma-20m', 
         'SSM-Base',
-    ], nn.Args(lr = 6e-4, epochs=4))
+    ], nn.Object(lr = 6e-4, epochs=4))

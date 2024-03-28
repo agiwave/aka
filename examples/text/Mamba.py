@@ -133,12 +133,12 @@ def Mamba(name):
     # -- Tokenizer --
     tokenizer = repo.AutoTokenizer(name)
     cfg = repo.fopen(name, 'config.json', ftype='json')
-    args = nn.Args(
+    args = nn.Object(
         tokenizer = tokenizer,
         vocab_size = cfg['vocab_size'],
         latent_dim = cfg['d_model'],
         layers = [
-            nn.Args(
+            nn.Object(
                 name = 'Mamba',
                 hidden_dim = cfg['intermediate_size'],
                 num_heads = cfg['intermediate_size'],

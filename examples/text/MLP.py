@@ -95,7 +95,7 @@ def MLPBlock(args):
 
 ########################### testing ##############################
 def MLPArgs(name):
-    mlp_args = nn.Args(
+    mlp_args = nn.Object(
         name = 'MLP',
         num_heads = 1,
         kv_size = 384 * 3,
@@ -113,14 +113,14 @@ def MLPArgs(name):
             mlp_args.kv_size = 384 * 3
         case _:
             assert False, f"Unknown name{name}"
-    return nn.Args(
+    return nn.Object(
         vocab_dim = 32,
         latent_dim = 384,
         resident_scale = True,
         dropout = 0.1,
         bias = False, # bias in Linear?
         layers = [
-            nn.Args(
+            nn.Object(
                 name = 'Attention',
                 windows_size = 64,  # Limit Attention Seq Length to 256. Gemma2b --> 8192
                 qk_dim = 384,
@@ -139,4 +139,4 @@ if __name__ == "__main__":
         'MLP-h4',
         'MLP-h8',
         'MLP-base'
-    ], nn.Args(lr = 6e-4, epochs=1))
+    ], nn.Object(lr = 6e-4, epochs=1))

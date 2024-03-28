@@ -7,7 +7,7 @@ def LLaMA(name):
     cfg = repo.fopen(name, 'config.json', ftype='json')
 
     # -- TODO Check it --
-    args = nn.Args(
+    args = nn.Object(
         tokenizer = tokenizer,
         vocab_size = 32000,
         block_size = 2048,
@@ -15,12 +15,12 @@ def LLaMA(name):
         rotary_embedding = True,
         lm_head = True,
         layers = [
-            nn.Args(
+            nn.Object(
                 name = 'Attention',
                 num_heads = 8,
                 num_kv_groups = 1
             ), 
-            nn.Args(
+            nn.Object(
                 name = 'MLP',
                 kv_size = 4096*4,   # ???
                 kv_gate = True,

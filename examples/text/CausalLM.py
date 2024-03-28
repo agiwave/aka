@@ -6,7 +6,8 @@ def MetaLayer(name, args):
     '''
     Build resident meta layer by name. Include: GQA(Group-Query Attention), MLP, GateMLP, ...
     '''
-    def __init__(self, args):
+    def __init__(self, kwargs):
+        args = nn.Object(**kwargs)
         import importlib
         module = importlib.import_module(name)
         short_name = name.split('./\\')[-1]
@@ -33,7 +34,8 @@ def CausalLM(args):
     '''
     Causal Language Model.
     '''
-    def __init__(self, args):
+    def __init__(self, kwargs):
+        args = nn.Object(**kwargs)
         in_proj, out_proj = None, None
         vocab_dim = getattr(args, 'vocab_dim', args.latent_dim)
         if vocab_dim != args.latent_dim:
@@ -60,7 +62,7 @@ def CausalLM(args):
         self.pad_x = pad_x
         self.embedding_scale = (None if not embedding_scale else math.sqrt(vocab_dim))
         self.embedding = nn.Embedding(num_embeddings=args.vocab_size, embedding_dim=vocab_dim)
-        self.layers = nn.ModuleList([make_layer(layer.name, args.cat(layer)) for layer in args.layers])
+        self.layers = nn.ModuleList([make_layer(layer['name'], dict(layer,**kwargs)) for layer in args.layers])
         self.in_proj = in_proj
         self.out_proj = out_proj
         self.lm_head = None if not lm_head else nn.Linear(vocab_dim, args.vocab_size,bias=False)
@@ -186,14 +188,14 @@ def CausalLM(args):
     return __init__(nn.Module(forward = forward, generate = generate, generator=generator),args)
 
 def CausalLMArgs(name):
-    mlp_args = nn.Args(
+    mlp_args = nn.Object(
         name = 'MLP',
         kv_size = 384*4,
         kv_gate = True,
         qk_dim = 384,
         hidden_dim = 384
     )
-    attn_args = nn.Args(
+    attn_args = nn.Object(
         name = 'Attention',
         qk_dim = 384,
         hidden_dim = 384,
@@ -201,7 +203,7 @@ def CausalLMArgs(name):
         num_kv_groups = 6,
         rotary_embedding = True,
     )
-    return nn.Args(
+    return nn.Object(
         vocab_size = 50304,
         vocab_dim = 64,
         block_size = 256,
@@ -216,7 +218,7 @@ if __name__ == "__main__":
     from RomeArena import TrainArena, RunArena
     TrainArena([
         'CausalLM-demo'
-    ], nn.Args(lr = 6e-4, epochs=3))
+    ], nn.Object(lr = 6e-4, epochs=3))
     # RunArena([
     #     'CausalLM-demo'
     # ], "Paul Daniels (born 4 June 1981 in Burlington)")

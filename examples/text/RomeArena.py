@@ -7,7 +7,7 @@ import aka.nn as nn
 import aka.repo as repo
 import aka.data
 
-def TrainArena(names, train_args):
+def TrainArena(roles, train_args):
     # -- Tokenizer --
     tokenizer = repo.AutoTokenizer('data/mamba-370m-hf')
     # class Tokenizer:
@@ -23,18 +23,21 @@ def TrainArena(names, train_args):
     # vocab_size = 256000
     
     # -- Roles --
-    roles = [nn.Args(name=name) for name in names]
+    roles = [nn.Object(name=name) for name in roles]
     import importlib
     for role in roles:
         module_name, sub_name = role.name.split('-')
         module = importlib.import_module(module_name)
         args = getattr(module, module_name+'Args')(sub_name)
-        args.tokenizer = tokenizer
-        args.vocab_size = 50304
-        if not hasattr(args, 'vocab_dim'):
-            args.vocab_dim = 64
-        args.dropout = 0.1
-        args.bias = False
+        args.update(dict(
+            tokenizer = tokenizer,
+            vocab_size = 50304,
+            dropout = 0.1,
+            bias = False
+        ))
+        if not 'vocab_dim' in args:
+            args['vocab_dim'] = 64
+
         role.args = args
         role.persist_filename = 'data/RomeArena/'+role.name+".ckt"
 
@@ -54,10 +57,10 @@ def TrainArena(names, train_args):
             CausalLM(role.args), 
             data_loader=dataloader,
             optimizer="Adam",
-            optimizer_kwargs={'lr':train_args.lr},
+            optimizer_kwargs={'lr':train_args['lr']},
             forward_kwargs={'state':{}},
             persist_filename = role.persist_filename,
-            epochs=train_args.epochs)
+            epochs=train_args['epochs'])
 
     # -- Plot --
     m_losses = [train(r) for r in roles]
@@ -74,18 +77,20 @@ def RunArena(names, prompt):
     tokenizer = repo.AutoTokenizer('data/mamba-370m-hf')
 
     # -- Roles --
-    roles = [nn.Args(name=name) for name in names]
+    roles = [nn.Object(name=name) for name in names]
     import importlib
     for role in roles:
         module_name, sub_name = role.name.split('-')
         module = importlib.import_module(module_name)
         args = getattr(module, module_name+'Args')(sub_name)
-        args.tokenizer = tokenizer
-        args.vocab_size = 50304
-        if not hasattr(args, 'vocab_dim'):
-            args.vocab_dim = 64
-        args.dropout = 0.1
-        args.bias = False
+        args.update(dict(
+            tokenizer = tokenizer,
+            vocab_size = 50304,
+            dropout = 0.1,
+            bias = False
+        ))
+        if not 'vocab_dim' in args:
+            args['vocab_dim'] = 64
         role.args = args
         role.persist_filename = 'data/RomeArena/'+role.name+".ckt"
 
@@ -110,5 +115,5 @@ if __name__ == "__main__":
         # 'RomeSet-vbdimpad',
         # 'RomeSet-vbdim',
         # 'RomeSet-novbdim',
-        ], nn.Args(lr = 6e-4, epochs=1)
+        ], nn.Object(lr = 6e-4, epochs=1)
     )

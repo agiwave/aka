@@ -161,4 +161,4 @@ if __name__ == "__main__":
     from RomeArena import TrainArena
     TrainArena([
         'RomeSet-AFT15m'
-    ], nn.Args(lr = 6e-4, epochs=3))
+    ], nn.Object(lr = 6e-4, epochs=3))

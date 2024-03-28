@@ -61,13 +61,13 @@ def CFFNBlock(args):
     return __init__(nn.Module(forward=forward), args)
 
 def CFFNArgs(name):
-    cffn_args = nn.Args(
+    cffn_args = nn.Object(
         name = 'CFFN',
         conv_size = 4,
         kv_size = 384 * 3,
         kv_gate = False,
     )
-    attn_args = nn.Args(
+    attn_args = nn.Object(
         name = 'Attention',
         windows_size = 64,  # Limit Attention Seq Length to 256. Gemma2b --> 8192
         num_heads = 8,
@@ -89,7 +89,7 @@ def CFFNArgs(name):
             cffn_args.num_heads = 4
         case _:
             assert False, f"Unknown name{name}"
-    return nn.Args(
+    return nn.Object(
         vocab_dim = 32,
         latent_dim = 384,
         resident_scale = True,
@@ -108,4 +108,4 @@ if __name__ == "__main__":
         # 'CFFN-head4',
         # 'CFFN-convh4',
         'CFFN-base'
-    ], nn.Args(lr = 6e-4, epochs=5))
+    ], nn.Object(lr = 6e-4, epochs=5))
