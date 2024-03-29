@@ -17,6 +17,7 @@ def empty(shape, dtype=None): return boot.invoke()
 def linspace(start, end, steps, *, dtype=None): return boot.invoke()
 
 def nan_to_num(input, nan=0.0, posinf=None, neginf=None): return boot.invoke()
+def clamp(input, min, max): return boot.invoke()
 
 def polar(abs, angle): return boot.invoke()
 def tril(input, diagonal=0): return boot.invoke()

@@ -134,8 +134,8 @@ def MLPArgs(name):
     )
 
 if __name__ == "__main__":
-    from RomeArena import TrainArena
-    TrainArena([
+    from RomeArena import TrainRoles
+    TrainRoles([
         'MLP-h4',
         'MLP-h8',
         'MLP-base'

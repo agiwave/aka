@@ -159,7 +159,7 @@ def AFTLocal(args):
     return __init__(nn.Module(forward=forward), nn.Object(**kwargs))
 
 if __name__ == "__main__":
-    from RomeArena import TrainArena
-    TrainArena([
+    from RomeArena import TrainRoles
+    TrainRoles([
         'RomeSet-AFT15m'
     ], lr = 6e-4, epochs=3)

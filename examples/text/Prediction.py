@@ -96,12 +96,12 @@ def PredictionArgs(name):
     return args
 
 if __name__ == "__main__":
-    from RomeArena import TrainArena, RunArena
-    TrainArena([
+    from RomeArena import TrainRoles, RunRoles
+    TrainRoles([
         'Prediction-base'
     ], lr = 6e-4, epochs=3)
 
-    # RunArena([
+    # RunRoles([
     #     'Prediction-base'
     # ], "Paul Daniels (born 4 June 1981 in Burlington)")
 

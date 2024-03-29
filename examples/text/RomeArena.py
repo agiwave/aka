@@ -7,9 +7,10 @@ import aka.nn as nn
 import aka.repo as repo
 import aka.data
 
-def TrainArena(roles, lr=1.e-4, epochs=1):
+def TrainRoles(roles, *, tokenizer=None, lr=1.e-4, epochs=1):
     # -- Tokenizer --
-    tokenizer = repo.AutoTokenizer('data/mamba-370m-hf')
+    if tokenizer is None:
+        tokenizer = repo.AutoTokenizer('data/mamba-370m-hf')
     # class Tokenizer:
     #     def __init__(self, path):
     #         from sentencepiece import SentencePieceProcessor
@@ -72,9 +73,10 @@ def TrainArena(roles, lr=1.e-4, epochs=1):
     plt.legend([r.name for r in roles], loc='upper right')
     plt.show()
 
-def RunArena(names, prompt):
+def RunRoles(names, prompt, *, tokenizer=None, ):
     # -- Tokenizer --
-    tokenizer = repo.AutoTokenizer('data/mamba-370m-hf')
+    if tokenizer is None:
+        tokenizer = repo.AutoTokenizer('data/mamba-370m-hf')
 
     # -- Roles --
     roles = [nn.Object(name=name) for name in names]
@@ -105,7 +107,7 @@ def RunArena(names, prompt):
         print('')
 
 if __name__ == "__main__":
-    TrainArena([
+    TrainRoles([
         # 'Gemma-20m', 
         'RomeSet-20m',
         # 'RomeSet-24vdim',

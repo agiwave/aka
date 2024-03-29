@@ -191,11 +191,11 @@ def CausalLMArgs(name):
     )
 
 if __name__ == "__main__":
-    from RomeArena import TrainArena, RunArena
-    TrainArena([
+    from RomeArena import TrainRoles, RunRoles
+    TrainRoles([
         'CausalLM-demo'
     ], lr = 6e-4, epochs=3)
-    # RunArena([
+    # RunRoles([
     #     'CausalLM-demo'
     # ], "Paul Daniels (born 4 June 1981 in Burlington)")
 

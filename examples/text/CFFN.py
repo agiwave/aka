@@ -102,8 +102,8 @@ def CFFNArgs(name):
     )
 
 if __name__ == "__main__":
-    from RomeArena import TrainArena
-    TrainArena([
+    from RomeArena import TrainRoles
+    TrainRoles([
         'CFFN-conv4',
         # 'CFFN-head4',
         # 'CFFN-convh4',

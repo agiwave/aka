@@ -179,8 +179,8 @@ if __name__ == "__main__":
     for w in m.generator("1girl"):
         print(w, end='')
 # <s> 1girl, absurdres, animal ear fluff, animal ears, bangs, bare shoulders, black hair, blue archive, blunt bangs, blush, closed mouth, collarbone, commentary request, eyes visible through hair, green eyes, hair between eyes, halo, hand on own face, hand up, highres, jacket, kisaki blue archive, long hair, long sleeves, looking at viewer, open clothes, open jacket, shinonome asu, simple background, solo, track jacket, upper body, white background, white jacket</s>
-    # from RomeArena import TrainArena
-    # TrainArena([
+    # from RomeArena import TrainRoles
+    # TrainRoles([
     #     # 'Gemma-20m', 
     #     'Retention-Ret',
     # ], lr = 6e-4, epochs=4)
