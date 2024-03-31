@@ -74,7 +74,7 @@ def MLPBlock(**kwargs):
             up = np.einsum('bld,md->blm', x, self.up_proj)
             if(self.gate_proj is not None):
                 gate = np.einsum('bld,md->blm', x, self.gate_proj)
-                gate = gate if self.act is None else self.act(gate)    # silu LLaMA ?
+                gate = gate if self.act is None else self.act(gate)
                 up = gate * up
             elif self.act is not None:
                 up = self.act(up)
@@ -84,7 +84,7 @@ def MLPBlock(**kwargs):
             up = np.einsum('blhd,hmd->blhm', x, self.up_proj)
             if(self.gate_proj is not None):
                 gate = np.einsum('blhd,hmd->blhm', x, self.gate_proj)
-                gate = gate if self.act is None else self.act(gate)    # silu LLaMA ?
+                gate = gate if self.act is None else self.act(gate)
                 up = gate * up
             elif self.act is not None:
                 up = self.act(up)

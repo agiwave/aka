@@ -22,7 +22,6 @@ def MetaLayer(**kwargs):
         y = self.norm(x)
         if self.x_gate is not None:
             x_gate = np.gelu(self.x_gate)
-            y = y * x_gate
             y = self.layer(y, **kwargs)
             y = y * x_gate
         else:

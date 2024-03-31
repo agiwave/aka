@@ -12,64 +12,94 @@ def HawkBlock(**kwargs):
     def __init__(self, **kwargs):
         args = nn.Object(**kwargs)
         self.hidden_dim = getattr(args, 'hidden_dim', args.latent_dim)
-        self.in_proj = nn.Linear(args.latent_dim, self.hidden_dim*2, bias=args.bias)
+        self.v_gate_dim = self.hidden_dim if getattr(args, 'v_gate', False) else 0
+        self.o_gate_dim = args.latent_dim if getattr(args, 'o_gate', True) else 0
+        self.num_heads = getattr(args, 'num_heads', 8)
+        assert self.hidden_dim % self.num_heads == 0
+        # rg, ig, v, vg, og
+        self.in_proj = nn.Linear(args.latent_dim, self.num_heads*2 + self.hidden_dim + self.v_gate_dim + self.o_gate_dim, bias=args.bias)
         self.conv_kernel_size = getattr(args, 'conv_kernel_size', 4)
-        self.conv1d = nn.Conv1d(
+        self.prev_conv = getattr(args, 'prev_conv', True)
+        self.post_conv = getattr(args, 'post_conv', False)
+        self.conv1d = None if not (self.prev_conv or self.post_conv) else nn.Conv1d(
             in_channels=self.hidden_dim,
             out_channels=self.hidden_dim,
             bias=args.bias,
             kernel_size=self.conv_kernel_size,
             groups=self.hidden_dim,
-            padding=0,
+            padding=0
         )
-        self.num_heads = getattr(args, 'num_heads', 1)
-        self.r_gate = nn.Linear(self.hidden_dim, self.num_heads)
-        self.i_gate = nn.Linear(self.hidden_dim, self.hidden_dim)
         self.c = nn.Parameter(np.array(-8.), requires_grad=False)
         self.delta = nn.Parameter(np.array(0.5))
         self.out_proj = nn.Linear(self.hidden_dim, args.latent_dim, bias=args.bias)
         return self
 
+    def conv(x, k, kernel_size, state, key):
+        (b, l, d) = x.shape
+        x = np.rearrange('b l d->b d l', x)
+        if state is not None:
+            conv_state = state.get(key,None)
+            if conv_state is not None:
+                x = np.cat((state[key], x), dim=2)
+            state[key] = x[:, :, (1 - kernel_size):].detach()
+        if x.size(2) < l + kernel_size - 1:
+            x = np.pad(x, (l + kernel_size - 1 - x.size(2), 0), mode='replicate')
+        x = k(x)
+        x = np.silu(x)
+        return np.rearrange('b d l->b l d', x)
+
     def forward(self, x, state=None, **kwargs):
         (b, l, d) = x.shape
-        (x, gate) = self.in_proj(x).chunk(2, dim=-1)
+        (rg, ig, x, vg, og) = self.in_proj(x).split([self.num_heads, self.num_heads, self.hidden_dim, self.v_gate_dim, self.o_gate_dim], dim=-1)
         
-        convx = np.rearrange('b l d->b d l',x)
-        if state is not None:
-            n_conv_state = self.conv_kernel_size-1
-            if 'gru_state' in state:
-                gru_state = state['gru_state']
-                convx = np.cat((state['conv_state'], convx), dim=2)
-            else:
-                gru_state = np.zeros(b, 1, self.num_heads, self.hidden_dim//self.num_heads, device=x.device)
-            state['conv_state'] = convx[:, :, -n_conv_state:].detach()
-        else:
-            n_conv_state = 0
-            gru_state = np.zeros(b, 1, self.num_heads, self.hidden_dim//self.num_heads, device=x.device)
+        # -- Prev Conv -- 
+        x = x if not self.prev_conv else conv(x, self.conv1d, self.conv_kernel_size, state, 'prev_conv_state')
 
-        if convx.size(2) < l + n_conv_state:
-            convx = np.pad(convx, (l + n_conv_state - convx.size(2), 0), value=0.)
-        x = self.conv1d(convx)
-        x = np.silu(x)
-        x = np.rearrange('b d l->b l d', x)
+        # -- RG_LRU or GRU --
+        rg = np.sigmoid(rg)
+        rg = np.exp((self.c * np.softplus(self.delta)) * rg).unsqueeze(-1)  # [B,L,H]
 
-        mask = np.tril(np.ones(l,l,device=x.device))
-        r = np.sigmoid(self.r_gate(x))
-        r = np.exp((self.c * np.softplus(self.delta)) * r)          # [B,L,H]
-        cuma = np.cumprod(r, dim=1)     # [a(1), a(1)*a(2), .... , a(1)*...*a(n)]
-        shifta = np.pad(cuma, (0,0,1,-1), value=1.0)
-
-        x = np.sigmoid(self.i_gate(x)) * x
         x = np.rearrange('b l (h d)->b l h d', x, h=self.num_heads) # [B,L,H,D]
-        shiftx = np.cat([gru_state,x[:,:l-1]], dim=1) - x
+        x = (1-rg)*np.sigmoid(ig).unsqueeze(-1) * x
 
-        shiftb = shiftx / (1.0e-10 + shifta.unsqueeze(-1))    # 'blhd,blh->blhd'
-        y = np.einsum('blh,lm,bmhd->blhd', cuma, mask, shiftb) + x
+        gru_state = None if state is None else state.get('gru_state',None)
+        gru_state = gru_state if gru_state is not None else np.zeros(b, 1, self.num_heads, self.hidden_dim//self.num_heads, device=x.device)
+
+        # ---- RNN --->
+        cumA = np.cumprod(rg, dim=1)
+        mask = np.tril(np.ones(l, l, device=a.device))
+        shiftA = np.pad(cumA, (0, 0, 0, 0, 1, -1), value=1.0)
+        shiftB = np.cat([s0, x[:,:l-1]], dim=1) / (1e-10+shiftA)
+        x = np.einsum('blhd,lm,bmhd->blhd', cumA, mask, shiftB) + x
+        # <--- RNN ----
+
         if state is not None:
-            state['gru_state'] = y[:,-1:].detach()
-        y = np.rearrange('b l h d->b l (h d)',y)
-        y = y * np.gelu(gate)
-        return self.out_proj(y)
+            state['gru_state'] = x[:,-1:].detach()
+        x = np.rearrange('b l h d->b l (h d)',x)
+
+        # mask = np.tril(np.ones(l,l,device=x.device))
+        # rg = np.sigmoid(rg)
+        # rg = np.exp((self.c * np.softplus(self.delta)) * rg)                # [B,L,H]
+        # cuma = np.cumprod(rg, dim=1)     # [a(1), a(1)*a(2), .... , a(1)*...*a(n)]
+        # shifta = np.pad(cuma, (0,0,1,-1), value=1.0)
+
+        # x = np.rearrange('b l (h d)->b l h d', x, h=self.num_heads) # [B,L,H,D]
+        # x = np.sigmoid(ig).unsqueeze(-1) * x
+        # gru_state = None if state is None else state.get('gru_state',None)
+        # gru_state = gru_state if gru_state is not None else np.zeros(b, 1, self.num_heads, self.hidden_dim//self.num_heads, device=x.device)
+        # shiftx = np.cat([gru_state,x[:,:l-1]], dim=1) - x
+        # shiftb = shiftx / (1.0e-10 + shifta.unsqueeze(-1))    # 'blhd,blh->blhd'
+        # x = np.einsum('blh,lm,bmhd->blhd', cuma, mask, shiftb) + x
+        # if state is not None:
+        #     state['gru_state'] = x[:,-1:].detach()
+        # x = np.rearrange('b l h d->b l (h d)',x)
+
+        # -- Post Conv -- 
+        x = x if not self.post_conv else conv(x, self.conv1d, self.conv_kernel_size, state, 'post_conv_state')
+
+        # Gate and Output
+        x = x if self.v_gate_dim <= 0 else x * np.gelu(vg)
+        return self.out_proj(x) if self.o_gate_dim <=0 else self.out_proj(x) * np.gelu(og)
     return __init__(nn.Module(forward = forward),**kwargs)
 
 def HawkArgs(name):
@@ -106,7 +136,7 @@ def HawkArgs(name):
                 args,
                 layers = [dict(
                     name = 'Hawk',
-                    num_heads = 8,
+                    num_heads = 8
                 )]*16,
             )
         case 'Griffin':
@@ -125,7 +155,7 @@ def HawkArgs(name):
                     ),
                 ]*8,
             )
-        case 'MambaOnly':
+        case 'Mamba':
             return dict(
                 args,
                 layers = [dict(
@@ -148,10 +178,10 @@ if __name__ == "__main__":
     from RomeArena import TrainRoles, RunRoles
     roles = [
         # 'Hawk-Hawk',
-        'Hawk-MambaOnly',
-        'Hawk-SSMOnly',
-        'Hawk-HawkOnly',
+        # 'Hawk-Mamba',
         # 'Hawk-Griffin',
+        'Hawk-HawkOnly',
+        # 'Hawk-SSMOnly',
     ]
     TrainRoles(roles, lr = 6e-3, epochs=1)
     # RunRoles(roles, 'My lord Sebastian')

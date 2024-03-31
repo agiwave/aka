@@ -15,7 +15,6 @@ def CFFNBlock(**kwargs):
         dropout = getattr(args, 'dropout', 0.2)
 
         # -- Attention Args
-        # args = args.mlp_args
         self.latent_dim = latent_dim
         self.qk_dim = getattr(args, 'qk_dim', latent_dim)
         self.kv_size = getattr(args, 'kv_size', latent_dim)
@@ -61,15 +60,15 @@ def CFFNBlock(**kwargs):
     return __init__(nn.Module(forward=forward), nn.Object(**kwargs))
 
 def CFFNArgs(name):
-    cffn_args = nn.Object(
+    cffn_args = dict(
         name = 'CFFN',
         conv_size = 4,
         kv_size = 384 * 3,
         kv_gate = False,
     )
-    attn_args = nn.Object(
+    attn_args = dict(
         name = 'Attention',
-        windows_size = 64,  # Limit Attention Seq Length to 256. Gemma2b --> 8192
+        windows_size = 64,
         num_heads = 8,
         num_kv_groups = 8,
         rotary_embedding = True
@@ -89,7 +88,7 @@ def CFFNArgs(name):
             cffn_args.num_heads = 4
         case _:
             assert False, f"Unknown name{name}"
-    return nn.Object(
+    return dict(
         vocab_dim = 32,
         latent_dim = 384,
         resident_gate = True,
