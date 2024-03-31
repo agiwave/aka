@@ -67,32 +67,15 @@ def HawkBlock(**kwargs):
 
         # ---- RNN --->
         cumA = np.cumprod(rg, dim=1)
-        mask = np.tril(np.ones(l, l, device=a.device))
+        mask = np.tril(np.ones(l, l, device=x.device))
         shiftA = np.pad(cumA, (0, 0, 0, 0, 1, -1), value=1.0)
-        shiftB = np.cat([s0, x[:,:l-1]], dim=1) / (1e-10+shiftA)
+        shiftB = np.cat([gru_state, x[:,:l-1]], dim=1) / (1e-10+shiftA)
         x = np.einsum('blhd,lm,bmhd->blhd', cumA, mask, shiftB) + x
         # <--- RNN ----
 
         if state is not None:
             state['gru_state'] = x[:,-1:].detach()
         x = np.rearrange('b l h d->b l (h d)',x)
-
-        # mask = np.tril(np.ones(l,l,device=x.device))
-        # rg = np.sigmoid(rg)
-        # rg = np.exp((self.c * np.softplus(self.delta)) * rg)                # [B,L,H]
-        # cuma = np.cumprod(rg, dim=1)     # [a(1), a(1)*a(2), .... , a(1)*...*a(n)]
-        # shifta = np.pad(cuma, (0,0,1,-1), value=1.0)
-
-        # x = np.rearrange('b l (h d)->b l h d', x, h=self.num_heads) # [B,L,H,D]
-        # x = np.sigmoid(ig).unsqueeze(-1) * x
-        # gru_state = None if state is None else state.get('gru_state',None)
-        # gru_state = gru_state if gru_state is not None else np.zeros(b, 1, self.num_heads, self.hidden_dim//self.num_heads, device=x.device)
-        # shiftx = np.cat([gru_state,x[:,:l-1]], dim=1) - x
-        # shiftb = shiftx / (1.0e-10 + shifta.unsqueeze(-1))    # 'blhd,blh->blhd'
-        # x = np.einsum('blh,lm,bmhd->blhd', cuma, mask, shiftb) + x
-        # if state is not None:
-        #     state['gru_state'] = x[:,-1:].detach()
-        # x = np.rearrange('b l h d->b l (h d)',x)
 
         # -- Post Conv -- 
         x = x if not self.post_conv else conv(x, self.conv1d, self.conv_kernel_size, state, 'post_conv_state')

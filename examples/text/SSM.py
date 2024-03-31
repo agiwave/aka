@@ -67,27 +67,26 @@ def SSMBlock(**kwargs):
         rkv = np.rearrange('b l (h k v)->b l h k v', rkv, h=self.num_heads, v=1)
         rkv = np.exp(-np.softplus(self.delta.unsqueeze(-1)) * np.sigmoid(rkv))   # [h num_states] * [b l h num_states]
         
-        k = np.rearrange('b l (h d)->b l h d', k, h=self.num_heads)
-        v = np.rearrange('b l (h d)->b l h d', v, h=self.num_heads)
-        kv = np.einsum('blhk,blhv->blhkv', np.silu(k), v)
-        kv = (1-rkv)*kv
+        k = np.rearrange('b l (h k v)->b l h k v', k, h=self.num_heads, v=1)
+        v = np.rearrange('b l (h k v)->b l h k v', v, h=self.num_heads, k=1)
+        kv = (1-rkv)*np.silu(k)*v
 
-        gru_state = None if state is None else state.get('gru_state',None)
-        gru_state = gru_state if gru_state is not None else np.zeros(b, 1, self.num_heads, self.num_states, d//self.num_heads, device=x.device)
+        ssm_state = None if state is None else state.get('ssm_state',None)
+        ssm_state = ssm_state if ssm_state is not None else np.zeros(b, 1, self.num_heads, self.num_states, d//self.num_heads, device=x.device)
         
         # -- RNN --
         cumA = np.cumprod(rkv, dim=1)
         mask = np.tril(np.ones(l, l, device=x.device))
         shiftA = np.pad(cumA, (0, 0, 0, 0, 0, 0, 1, -1), value=1.0)
-        shiftB = np.cat([gru_state, kv[:,:l-1]], dim=1) / (1e-10+shiftA)
-        kv = np.einsum('blhdn,lm,bmhdn->blhdn', cumA, mask, shiftB) + kv
+        shiftB = np.cat([ssm_state, kv[:,:l-1]], dim=1) / (1e-10+shiftA)
+        kv = np.einsum('blhkv,lm,bmhkv->blhkv', cumA, mask, shiftB) + kv
         # -- RNN --
         
         q = np.rearrange('b l (h k v)->b l h k v', q, h=self.num_heads, v=1)
         x = np.einsum('blhkv,blhkv->blhv', np.silu(q), kv)
         x = np.rearrange('b l h d->b l (h d)', x)
         if state is not None:
-            state['gru_state'] = kv[:,-1:].detach()
+            state['ssm_state'] = kv[:,-1:].detach()
 
         # -- Post Conv -- 
         x = x if not self.post_conv else conv(x, self.conv1d, self.conv_kernel_size, state, 'post_conv_state')
@@ -132,7 +131,7 @@ def SSMArgs(name):
                 layers = [dict(
                     name = 'SSM',
                     num_heads = 8,
-                    num_states = 4,
+                    num_states = 1,
                     hidden_dim = args['latent_dim']
                 )]*16,
             )
