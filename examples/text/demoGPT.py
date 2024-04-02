@@ -12,8 +12,8 @@ if __name__ == "__main__":
     ])
     mlp_args = nn.Object(
         name = 'MLP',
-        qk_dim = 64,
-        kv_size = 384*4,
+        k_dim = 64,
+        k_size = 384*4,
         kv_gate = True,
     )
     attn_args = nn.Object(

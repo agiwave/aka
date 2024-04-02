@@ -108,7 +108,7 @@ def HawkArgs(name):
                     ),
                     dict(
                         name = "MLP",
-                        kv_size = args['latent_dim']*3,
+                        k_size = args['latent_dim']*3,
                         kv_gate = True
                     )
                 ]*8,
@@ -155,7 +155,7 @@ def HawkArgs(name):
                     ),
                     dict(
                         name = 'RWKVCMixer',
-                        kv_size = args['latent_dim']*3,
+                        k_size = args['latent_dim']*3,
                         kv_gate = True
                     )
                 ]*8,

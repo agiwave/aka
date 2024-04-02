@@ -6,7 +6,7 @@ def CFFNBlock(**kwargs):
     CFFN - Conv-FFN
     Args:
         args.latent_dim 
-        args.attn_args.qk_dim(Optional, default: latent_dim)
+        args.attn_args.k_dim(Optional, default: latent_dim)
     '''
     def __init__(self,args):
         # -- Global Args --
@@ -16,22 +16,22 @@ def CFFNBlock(**kwargs):
 
         # -- Attention Args
         self.latent_dim = latent_dim
-        self.qk_dim = getattr(args, 'qk_dim', latent_dim)
-        self.kv_size = getattr(args, 'kv_size', latent_dim)
+        self.k_dim = getattr(args, 'k_dim', latent_dim)
+        self.k_size = getattr(args, 'k_size', latent_dim)
         self.kv_gate =  getattr(args, 'kv_gate', False)
         self.hidden_dim = getattr(args, 'hidden_dim', latent_dim)
         self.num_heads = getattr(args, 'num_heads', 1)
-        self.in_proj = None if self.qk_dim == self.latent_dim else nn.Linear(self.latent_dim, self.qk_dim, bias=bias)
+        self.in_proj = None if self.k_dim == self.latent_dim else nn.Linear(self.latent_dim, self.k_dim, bias=bias)
         self.conv_size = getattr(args, 'conv_size', 4)
-        h_qk_dim = self.qk_dim // self.num_heads
+        h_k_dim = self.k_dim // self.num_heads
         if self.conv_size > 1:
-            self.conv_proj = nn.Conv1d(self.qk_dim, self.num_heads * self.kv_size, kernel_size=self.conv_size, stride=1, padding=0, groups=self.num_heads, bias=bias)
+            self.conv_proj = nn.Conv1d(self.k_dim, self.num_heads * self.k_size, kernel_size=self.conv_size, stride=1, padding=0, groups=self.num_heads, bias=bias)
         else:
-            self.up_proj = nn.Parameter(shape=(self.num_heads, self.kv_size, h_qk_dim))
-        self.gate_proj = None if not self.kv_gate else nn.Parameter(shape=(self.num_heads, self.kv_size, h_qk_dim))
+            self.up_proj = nn.Parameter(shape=(self.num_heads, self.k_size, h_k_dim))
+        self.gate_proj = None if not self.kv_gate else nn.Parameter(shape=(self.num_heads, self.k_size, h_k_dim))
         act = getattr(args, 'activation', 'gelu')
         self.act = getattr(np, act)
-        self.down_proj = nn.Parameter(shape=(self.num_heads, self.kv_size, self.hidden_dim//self.num_heads))
+        self.down_proj = nn.Parameter(shape=(self.num_heads, self.k_size, self.hidden_dim//self.num_heads))
         self.out_proj = None if self.hidden_dim == self.latent_dim else nn.Linear(self.hidden_dim, self.latent_dim, bias=bias)
         self.dropout = nn.Dropout(dropout)
         return self
@@ -63,7 +63,7 @@ def CFFNArgs(name):
     cffn_args = dict(
         name = 'CFFN',
         conv_size = 4,
-        kv_size = 384 * 3,
+        k_size = 384 * 3,
         kv_gate = False,
     )
     attn_args = dict(
@@ -77,13 +77,13 @@ def CFFNArgs(name):
         case 'base':
             cffn_args.conv_size = 1
         case 'conv4':
-            cffn_args.qk_dim = 384//4
+            cffn_args.k_dim = 384//4
             cffn_args.conv_size = 4
         case 'head4':
             cffn_args.conv_size = 1
             cffn_args.num_heads = 4
         case 'convh4':
-            cffn_args.qk_dim = 384//4
+            cffn_args.k_dim = 384//4
             cffn_args.conv_size = 4
             cffn_args.num_heads = 4
         case _:

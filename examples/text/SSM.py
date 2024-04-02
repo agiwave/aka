@@ -169,7 +169,7 @@ def SSMArgs(name):
                     ),
                     dict(
                         name = "MLP",
-                        kv_size = args['latent_dim']*3,
+                        k_size = args['latent_dim']*3,
                         kv_gate = True
                     )
                 ]*8,
@@ -184,7 +184,7 @@ def SSMArgs(name):
                     ),
                     dict(
                         name = "MLP",
-                        kv_size = args['latent_dim']*3,
+                        k_size = args['latent_dim']*3,
                         kv_gate = True
                     )
                 ]*8,
@@ -210,7 +210,7 @@ def SSMArgs(name):
                     ),
                     dict(
                         name = "MLP",
-                        kv_size = args['latent_dim']*3,
+                        k_size = args['latent_dim']*3,
                         kv_gate = True
                     )
                 ]*8,
@@ -260,7 +260,7 @@ def SSMArgs(name):
                     ),
                     dict(
                         name = 'RWKVCMixer',
-                        kv_size = args['latent_dim']*3,
+                        k_size = args['latent_dim']*3,
                         kv_gate = True
                     )
                 ]*8,
@@ -276,7 +276,7 @@ def SSMArgs(name):
                     ),
                     dict(
                         name = "MLP",
-                        kv_size = args['latent_dim']*3,
+                        k_size = args['latent_dim']*3,
                         kv_gate = True
                     )
                 ]*8,
@@ -297,5 +297,5 @@ if __name__ == "__main__":
         'SSM-RWKV',
         'SSM-RetNet'
     ]
-    TrainRoles(roles, lr = 6e-3, epochs=4)
-    # RunRoles(roles, 'My lord Sebastian')
+    # TrainRoles(roles, lr = 6e-3, epochs=4)
+    RunRoles(roles, 'My lord Sebastian')

@@ -165,14 +165,14 @@ def CausalLM(**kwargs):
 def CausalLMArgs(name):
     mlp_args = dict(
         name = 'MLP',
-        kv_size = 384*4,
+        k_size = 384*4,
         kv_gate = True,
-        qk_dim = 384,
+        k_dim = 384,
         hidden_dim = 384
     )
     attn_args = dict(
         name = 'Attention',
-        qk_dim = 384,
+        k_dim = 384,
         hidden_dim = 384,
         num_heads = 6,
         num_kv_groups = 6,

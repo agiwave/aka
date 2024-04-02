@@ -32,7 +32,7 @@ if __name__ == "__main__":
             ), 
             nn.Object(
                 name = 'MLP',
-                kv_size = 768*4,
+                k_size = 768*4,
                 kv_gate = False,
             )
         ]*6,

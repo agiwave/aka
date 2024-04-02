@@ -5,7 +5,7 @@ def PredictionBlock(**kwargs):
     '''
         in ----> feat(B,L,feat_dim) --(conv)
              |                          |
-             |                 q(B,L,qk_dim) --(K,V)
+             |                 q(B,L,k_dim) --(K,V)
              |                                  |
              |                              y(B,L,hidden_dim) --(out_proj)-> out
              |                                  |
@@ -20,21 +20,21 @@ def PredictionBlock(**kwargs):
         args = args.pred_args
         hidden_dim = getattr(args, 'hidden_dim', latent_dim)
         feat_dim = getattr(args,'feat_dim', hidden_dim)
-        qk_dim = getattr(args, 'qk_dim', feat_dim)
-        kv_size = getattr(args, 'kv_size', latent_dim)
+        k_dim = getattr(args, 'k_dim', feat_dim)
+        k_size = getattr(args, 'k_size', latent_dim)
         kv_gate = getattr(args, 'kv_gate', True)
         kernel_size = getattr(args, 'kernel_size', 3)
 
-        self.qk_dim = qk_dim
+        self.k_dim = k_dim
         self.feat_dim = feat_dim
         self.hidden_dim = hidden_dim
         self.kernel_size = kernel_size
         self.in_proj = nn.Linear(latent_dim, hidden_dim + feat_dim, bias=bias)
         self.out_proj = None if hidden_dim==latent_dim else nn.Linear(hidden_dim, latent_dim, bias=bias)
-        self.K = nn.Linear(qk_dim, kv_size, bias=bias)
-        self.G = None if not kv_gate else nn.Linear(qk_dim, kv_size, bias=bias)
-        self.V = nn.Linear(kv_size, hidden_dim, bias=bias)
-        self.Conv = nn.Conv2d(1, qk_dim, kernel_size=(kernel_size, feat_dim), stride=1, padding=0)
+        self.K = nn.Linear(k_dim, k_size, bias=bias)
+        self.G = None if not kv_gate else nn.Linear(k_dim, k_size, bias=bias)
+        self.V = nn.Linear(k_size, hidden_dim, bias=bias)
+        self.Conv = nn.Conv2d(1, k_dim, kernel_size=(kernel_size, feat_dim), stride=1, padding=0)
         return self
 
     def forward(self, inputs, targets=False, state = None,**kwargs):
@@ -49,7 +49,7 @@ def PredictionBlock(**kwargs):
 
         # conv x
         feat_x = np.pad(feat_x, (0,0,kernel_size-1,0), value=float(0.))
-        feat_x = self.Conv(feat_x.unsqueeze(1)) # B, qk_dim, L, 1
+        feat_x = self.Conv(feat_x.unsqueeze(1)) # B, k_dim, L, 1
         feat_x = np.einsum('bqlw->blq', feat_x)
         feat_x = np.gelu(feat_x)
         feat_x = self.K(feat_x)
@@ -82,8 +82,8 @@ def PredictionArgs(name):
     )
     pred_args = dict(
         name = 'Prediction',
-        qk_dim = 64,
-        kv_size = 384 * 3,
+        k_dim = 64,
+        k_size = 384 * 3,
         kv_gate = False,
         feat_dim = 64,
         kernel_size = 4
