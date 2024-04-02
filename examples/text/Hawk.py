@@ -60,8 +60,7 @@ def HawkBlock(**kwargs):
         rg = np.exp((self.c * np.softplus(self.delta)) * rg).unsqueeze(-1)  # [B,L,H]
 
         x = np.rearrange('b l (h d)->b l h d', x, h=self.num_heads) # [B,L,H,D]
-        x = (1-rg)*np.sigmoid(ig).unsqueeze(-1) * x
-
+        x = (1-rg)**np.sigmoid(ig).unsqueeze(-1) * x # The orginal paper: np.sqrt(1-rg**2)*np.sigmoid(ig).unsqueeze(-1) * x
         gru_state = None if state is None else state.get('gru_state',None)
         gru_state = gru_state if gru_state is not None else np.zeros(b, 1, self.num_heads, self.hidden_dim//self.num_heads, device=x.device)
 
@@ -146,6 +145,21 @@ def HawkArgs(name):
                     num_heads = 8,
                 )]*16,
             )
+        case 'RWKV':
+            return dict(
+                args,
+                layers = [
+                    dict(
+                        name = 'RWKVTMixer',
+                        num_heads = 8,
+                    ),
+                    dict(
+                        name = 'RWKVCMixer',
+                        kv_size = args['latent_dim']*3,
+                        kv_gate = True
+                    )
+                ]*8,
+            )
         case 'SSMOnly':
             return dict(
                 args,
@@ -163,7 +177,8 @@ if __name__ == "__main__":
         # 'Hawk-Hawk',
         # 'Hawk-Mamba',
         # 'Hawk-Griffin',
-        'Hawk-HawkOnly',
+        'Hawk-RWKV',
+        # 'Hawk-HawkOnly',
         # 'Hawk-SSMOnly',
     ]
     TrainRoles(roles, lr = 6e-3, epochs=1)

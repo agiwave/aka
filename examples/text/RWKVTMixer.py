@@ -56,27 +56,7 @@ def RWKV_Tmix_x060(**kwargs):
         self.output = nn.Linear(self.dim_att, args.latent_dim, bias=False)
         self.gate = nn.Linear(args.latent_dim, self.dim_att, bias=False)
         self.ln_x = nn.GroupNorm(self.n_head, self.dim_att, eps=(1e-5)*(getattr(args,'head_size_divisor',8)**2))
-        self.decay = nn.Parameter(
-            data=np.log(1 - 2 ** (-5 - np.arange(self.n_head, dtype=np.float))),
-            requires_grad=getattr(args,'lr',False)
-        )
         return self
-
-    def compute_mask(decay, qlen, klen, n_heads):
-        if qlen == 1:
-            return np.exp(decay)[None, :, None, None]
-        else:
-            index = np.arange(klen).to(decay)
-            mask = np.tril(np.ones(qlen, klen), diagonal=klen-qlen).to(decay)
-            mask = np.masked_fill(
-                index[-qlen:, None] - index[None, :], ~mask.bool(), float("inf")
-            )
-            mask = np.exp(mask * decay[:, None, None])
-            mask = np.nan_to_num(mask)
-            mask = mask.unsqueeze(0)  # [1, h, t, t]
-            mask = mask / mask.sum(dim=-1, keepdim=True).sqrt()
-            mask = np.nan_to_num(mask, nan=0.0)
-            return mask
 
     def forward(self, x, state=None, **kwargs):
         B, T, C = x.size()
@@ -104,27 +84,19 @@ def RWKV_Tmix_x060(**kwargs):
 
         if False:# TODO translate CUDA to torch
             x = RUN_CUDA_RWKV6(B, T, C, self.n_head, r, k, v, w, u=self.time_faaaa)
-        else: # -- Temp use RetNet implementation --
-            r = np.rearrange('b l (h d)->b h l d', r, h=self.n_head)
-            k = np.rearrange('b l (h d)->b h l d', k, h=self.n_head)
-            v = np.rearrange('b l (h d)->b h l d', v, h=self.n_head)
+        else:
+            k = np.clamp(k, max=30, min=-60) # clamp extreme values. e^30 = 10^13
+            k = np.exp(k)
+            sum_k = np.cumsum(k, dim=1)
+            kv = (k * v).view(B, T, self.n_head, -1)
+            w = w.view(B, T, self.n_head, -1)
+            k = k.view(B, T, self.n_head, -1)
+            # wkv = (np.einsum('htu,buhc->bthc', w, kv)).contiguous().view(B, T, -1)
+            mask = np.tril(np.ones(T,T, device=x.device))
+            wkv = (np.einsum('bthc,tu,buhc->bthc', w, mask, kv)).contiguous().view(B, T, -1)
+            wk = (np.einsum('bthc,tu,buhc->bthc', w, mask, k)).contiguous().view(B, T, -1)
+            x = np.sigmoid(r) * wkv / wk
             
-            # -- qkv (Q @ K * D) @ V --
-            decay_mask = compute_mask(self.decay, r.size(2), k.size(2), self.n_head)
-            x = np.einsum('bhld,bhmd,bhlm,bhmv->blhv', r, k, decay_mask, v)
-
-            # -- state --
-            if state is not None:
-                current_S = np.einsum('bhld,bhlv,bhl->bhvd', k, v, decay_mask[:, :, -1])
-                if 'prev_S' in state:
-                    prev_S = state["prev_S"]       # ->[b, h, d, v]
-                    decay = decay_mask[:, :, :, 0] # ->[b, h, t]
-                    # S += S0 * (gamma ** n)
-                    current_S += np.einsum('bhvd,bh->bhvd', prev_S, decay[:,:,-1])
-                    # V += Q @ decay * S0
-                    x += np.einsum('bhld,bhvd,bhl->blhv', r, prev_S, decay)
-                state["prev_S"] = current_S.detach()
-
         x = np.reshape(x, (B * T, C))
         x = self.ln_x(x).view(B, T, C)
         return self.output(x * g)
