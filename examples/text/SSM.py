@@ -4,7 +4,7 @@ import aka.numpy as np
 def SSMBlock(**kwargs):
     '''
     SSM:
-        h.shape = [b, num_heads, num_states, hidden_dim//num_heads]
+        h.shape = [b, num_heads, k_dim//num_heads, hidden_dim//num_heads]
         h(n) = A(n) * h(n-1) + B(n) * x(n)
         y(n) = C(n) * h(n)   + D(n) * x(n)
              = C(n) * h(n) ...
@@ -15,15 +15,16 @@ def SSMBlock(**kwargs):
     def __init__(self, **kwargs):
         args = nn.Object(**kwargs)
         self.hidden_dim = getattr(args, 'hidden_dim', args.latent_dim)
-        self.num_states = getattr(args, 'num_states', 8)
+        self.num_heads = getattr(args, 'num_heads', 8)
+        self.k_dim = getattr(args, 'k_dim', self.num_heads*8)
         self.gh_dim = self.hidden_dim if getattr(args, 'v_gate', False) else 0
         self.go_dim = args.latent_dim if getattr(args, 'o_gate', True) else 0
-        self.num_heads = getattr(args, 'num_heads', 8)
         assert self.hidden_dim % self.num_heads == 0
+        assert self.k_dim % self.num_heads == 0
 
         # A, B, C, gv, v, gh, go
         self.A_mode = getattr(args, 'A_mode', 0)
-        self.in_proj = nn.Linear(args.latent_dim, self.num_heads * self.num_states + 3 * self.num_heads + self.hidden_dim + self.gh_dim + self.go_dim, bias=args.bias)
+        self.in_proj = nn.Linear(args.latent_dim, self.k_dim + 3 * self.num_heads + self.hidden_dim + self.gh_dim + self.go_dim, bias=args.bias)
         self.conv_kernel_size = getattr(args, 'conv_kernel_size', 4)
         self.prev_conv = getattr(args, 'prev_conv', True)
         self.post_conv = getattr(args, 'post_conv', False)
@@ -37,7 +38,7 @@ def SSMBlock(**kwargs):
         )
         self.delta = nn.Parameter(np.arange(1, 1 + self.num_heads, dtype=np.float))
         self.out_proj = nn.Linear(self.hidden_dim, args.latent_dim, bias=args.bias)
-        self.C = nn.Parameter(shape=(self.num_states, self.num_heads, self.num_states))
+        self.C = nn.Parameter(shape=(self.k_dim // self.num_heads, self.num_heads, self.k_dim // self.num_heads))
         self.norm_v = nn.RMSNorm(self.hidden_dim)
         return self
 
@@ -59,7 +60,7 @@ def SSMBlock(**kwargs):
         (b, l, d) = x.shape
         (A, B, C, v, gv, gh, go) = self.in_proj(x).split([
             self.num_heads, self.num_heads,
-            self.num_states * self.num_heads,
+            self.k_dim,
             self.hidden_dim,
             self.num_heads, self.gh_dim, self.go_dim], dim=-1)
         
@@ -70,7 +71,7 @@ def SSMBlock(**kwargs):
         ssm_state = None if state is None else state.get('ssm_state',None)
         (t,s0) = ssm_state if ssm_state is not None else (
             0,      # t
-            None    # np.zeros(b, 1, self.num_heads, self.num_states, d//self.num_heads, device=x.device)
+            None    # np.zeros(b, 1, self.num_heads, self.k_dim//self.num_heads, d//self.num_heads, device=x.device)
         )
 
         C = np.softmax(np.rearrange('b l (h k)->b l h k', C, h=self.num_heads), dim=-1)
@@ -87,11 +88,11 @@ def SSMBlock(**kwargs):
                 assert False
         v = np.rearrange('b l (h v)->b l h v', v, h=self.num_heads) * np.sigmoid(gv).unsqueeze(-1)
 
-        if self.num_states * l <= 4096:
+        if self.k_dim * l <= 8192:
             k = np.rearrange('b l h (k v)->b l h k v', B, v=1)
             v = np.rearrange('b l h (k v)->b l h k v', v, k=1)
             A = A.unsqueeze(-1)
-            s0 = s0 if s0 is not None else np.zeros(b, 1, self.num_heads, self.num_states, d//self.num_heads, device=x.device)
+            s0 = s0 if s0 is not None else np.zeros(b, 1, self.num_heads, self.k_dim//self.num_heads, d//self.num_heads, device=x.device)
             kv = (1-A)*k*v
 
             # -- RNN --
@@ -195,7 +196,7 @@ def SSMArgs(name):
                 layers = [dict(
                     name = 'SSM',
                     num_heads = 8,
-                    num_states = 8,
+                    k_dim = 64,
                     hidden_dim = args['latent_dim']
                 )]*16,
             )
@@ -221,7 +222,7 @@ def SSMArgs(name):
                 layers = [dict(
                     name = 'SSM',
                     num_heads = 8,
-                    num_states = 8,
+                    k_dim = 64,
                     hidden_dim = args['latent_dim']
                 )]*16,
             )
