@@ -265,14 +265,14 @@ if __name__ == "__main__":
     from RomeArena import TrainRoles, RunRoles
     roles = [
         # 'SSM-SSM',
-        'SSM-SSMOnly',
+        # 'SSM-SSMOnly',
         # 'SSM-Gemma',
         # 'SSM-Hawk',
         # 'SSM-HawkOnly',
         # 'SSM-Griffin',
         # 'SSM-Mamba',
         # 'SSM-RWKV',
-        # 'SSM-RetNet'
+        'SSM-RetNet'
     ]
     TrainRoles(roles, lr = 6e-3, epochs=4)
     # RunRoles(roles, 'My lord Sebastian')

@@ -7,11 +7,10 @@ import aka.nn as nn
 import aka.repo as repo
 import aka.data
 
-def TrainRoles(roles, *, tokenizer=None, lr=1.e-4, epochs=1):
+def TrainRoles(roles, *, repo_name='data/bookcorpus', tokenizer=None, lr=1.e-4, epochs=1):
     # -- Tokenizer --
-    repoName = 'data/pretrain'
     if tokenizer is None:
-        tokenizer = repo.AutoTokenizer(repoName)
+        tokenizer = repo.AutoTokenizer(repo_name)
     # class Tokenizer:
     #     def __init__(self, path):
     #         from sentencepiece import SentencePieceProcessor
@@ -33,7 +32,7 @@ def TrainRoles(roles, *, tokenizer=None, lr=1.e-4, epochs=1):
         args = getattr(module, module_name+'Args')(sub_name)
         args.update(dict(
             tokenizer = tokenizer,
-            vocab_size = 50304,
+            vocab_size = 50304, #tokenizer.vocab_size,
             dropout = 0.1,
             bias = False
         ))
@@ -44,8 +43,7 @@ def TrainRoles(roles, *, tokenizer=None, lr=1.e-4, epochs=1):
         role.persist_filename = 'data/RomeArena/'+role.name+".ckt"
 
     # -- Data loader
-    # dataset = repo.AutoDataset("bookcorpus", token='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')
-    dataset = repo.AutoDataset('text', data_dir=repoName, split='train')
+    dataset = repo.AutoDataset('text', data_dir=repo_name, split='train')
     dataloader = aka.data.TextStreamingLoader(
                     dataset, 
                     tokenizer=tokenizer, 
@@ -76,10 +74,10 @@ def TrainRoles(roles, *, tokenizer=None, lr=1.e-4, epochs=1):
     plt.legend([r.name for r in roles], loc='upper right')
     plt.show()
 
-def RunRoles(names, prompt, *, tokenizer=None, ):
+def RunRoles(names, prompt, *, repo_name='data/bookcorpus', tokenizer=None):
     # -- Tokenizer --
     if tokenizer is None:
-        tokenizer = repo.AutoTokenizer('data/mamba-370m-hf')
+        tokenizer = repo.AutoTokenizer(repo_name)
 
     # -- Roles --
     roles = [nn.Object(name=name) for name in names]
@@ -90,7 +88,7 @@ def RunRoles(names, prompt, *, tokenizer=None, ):
         args = getattr(module, module_name+'Args')(sub_name)
         args.update(dict(
             tokenizer = tokenizer,
-            vocab_size = 50304,
+            vocab_size = 50304, # tokenizer.vocab_size,
             dropout = 0.1,
             bias = False
         ))
