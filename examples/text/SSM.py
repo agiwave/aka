@@ -78,62 +78,42 @@ def SSMBlock(**kwargs):
         B = C * np.sigmoid(B).unsqueeze(-1)
         match self.A_mode:
             case 0: # from B
-                A = np.exp(-np.softplus(self.delta).unsqueeze(-1) * B)   # [h] * [b l h k]
+                A = (-np.softplus(self.delta).unsqueeze(-1) * B)   # [h] * [b l h k]
             case 1: # Fixed
                 A = self.delta.view(1, 1, self.num_heads, 1)
-                A = np.repeat(np.exp(-np.softplus(A)), l, dim=1)         # [h] * [b l h k]
+                A = np.repeat((-np.softplus(A)), l, dim=1)         # [h] * [b l h k]
             case 2: # Indenpent
-                A = np.exp(-(np.softplus(self.delta) * np.sigmoid(A)).unsqueeze(-1)*C)
+                A = (-(np.softplus(self.delta) * np.sigmoid(A)).unsqueeze(-1)*C)
             case _:
                 assert False
         v = np.rearrange('b l (h v)->b l h v', v, h=self.num_heads) * np.sigmoid(gv).unsqueeze(-1)
 
-        if self.k_dim * l <= 8192:
-            k = np.rearrange('b l h (k v)->b l h k v', B, v=1)
-            v = np.rearrange('b l h (k v)->b l h k v', v, k=1)
-            A = A.unsqueeze(-1)
-            s0 = s0 if s0 is not None else np.zeros(b, 1, self.num_heads, self.k_dim//self.num_heads, d//self.num_heads, device=x.device)
-            kv = (1-A)*k*v
+        k = np.rearrange('b l h (k v)->b l h k v', B, v=1)
+        v = np.rearrange('b l h (k v)->b l h k v', v, k=1)
+        A = A.unsqueeze(-1)
+        s0 = s0 if s0 is not None else np.zeros(b, 1, self.num_heads, self.k_dim//self.num_heads, d//self.num_heads, device=x.device)
+        kv = (1-np.exp(A))*k*v
 
-            # -- RNN --
-            cumA = np.cumprod(A, dim=1)
+        # -- RNN --
+        if False:# Approximate version and faster. May cause vanishing gradient
             mask = np.tril(np.ones(l, l, device=x.device))
+            cumA = np.exp(np.cumsum(A, dim=1))
             shiftA = np.pad(cumA, (0, 0, 0, 0, 0, 0, 1, -1), value=1.0)
             shiftB = np.cat([s0, kv[:,:l-1]], dim=1) / (1e-10+shiftA)
             kv = np.einsum('blhkv,lm,bmhkv->blhkv', cumA, mask, shiftB) + kv
-            # -- RNN --
+        else:# Accurate Vesion, But expensive.
+            mask = np.tril(np.ones(l, l, device=x.device))[:,:,None,None,None]   #[l m h k d]
+            cumA = A.unsqueeze(2)*mask
+            cumA = np.exp(np.cumsum(cumA, dim=1))*mask
+            shiftB = np.cat([s0, kv[:,:l-1]], dim=1)
+            kv = np.einsum('blmhkv,bmhkv->blhkv', cumA, shiftB) + kv
+        # -- RNN --
 
-            q = np.rearrange('b l h (k v)->b l h k v', C, v=1)
-            x = np.einsum('blhkv,blhkv->blhv', q, kv)
-            x = np.rearrange('b l h d->b l (h d)', x)
-            if state is not None:
-                state[ssm_state] = (t+l, kv[:,-1:].detach())
-        else:
-            #
-            # To avoid L*K*V memories size alloc. 
-            #   y = C( A(s0) + AB(x(0)~x(n-1)) + B(x)) )
-            #   S = sum(A(s0) + AB(x(0)~x(n-1) + B(x(n)) )                
-            #
-            cumA = np.cumprod(A, dim=1)
-            mask = np.tril(np.ones(l, l, device=x.device))[:,1:]
-            # ??? I'm thinking about how to avoid it below. Use h*L*L masking can help, but really do it like that?
-            shiftB = B[:,:l-1] / (1e-10+cumA[:,:l-1])
-            shiftV = v[:,:l-1]
-            y = np.einsum('blhk,blhk,blhv->blhv',B,C,v)
-
-            cumA = np.rearrange('b l h (k v)->b l h k v', cumA, v=1)
-            shiftB = np.rearrange('b m h (k v)->b m h k v', shiftB, v=1)
-            C = np.rearrange('b l h (k v)->b l h k v', C, v=1)
-            shiftV = np.rearrange('b m h (k v)->b m h k v', shiftV, k=1)
-            y += np.einsum('bmhkv,bmhkv,lm,blhkv,blhkv->blhv', shiftB, shiftV, mask, cumA, C)
-            if state is not None:
-                ssm_state = np.einsum('blhk,blhv->bhkv',B,v)
-                ssm_state += np.einsum('bmhkv,bmhkv,bhkv,bhkv->bhkv', shiftB, shiftV, cumA[:,-1], C[:,-1])
-                if s0 is not None:
-                    y += np.einsum('blhkv,blhkv,blhkv->blhv', cumA, s0.unsqueeze(1), C)
-                    ssm_state += cumA[:,-1] * s0
-                state['ssm_state'] = ((t+l)%(1024*1024), ssm_state.detach())
-            x = np.rearrange('b l h d->b l (h d)', y)
+        q = np.rearrange('b l h (k v)->b l h k v', C, v=1)
+        x = np.einsum('blhkv,blhkv->blhv', q, kv)
+        x = np.rearrange('b l h d->b l (h d)', x)
+        if state is not None:
+            state[ssm_state] = (t+l, kv[:,-1:].detach())
 
         # -- Post Conv -- 
         x = x if not self.post_conv else conv(x, self.conv1d, self.conv_kernel_size, state, 'post_conv_state')
@@ -288,7 +268,7 @@ def SSMArgs(name):
 if __name__ == "__main__":
     from RomeArena import TrainRoles, RunRoles
     roles = [
-        'SSM-SSM',
+        # 'SSM-SSM',
         'SSM-SSMOnly',
         'SSM-Gemma',
         'SSM-Hawk',
@@ -298,5 +278,5 @@ if __name__ == "__main__":
         'SSM-RWKV',
         'SSM-RetNet'
     ]
-    # TrainRoles(roles, lr = 6e-3, epochs=4)
-    RunRoles(roles, 'My lord Sebastian')
+    TrainRoles(roles, lr = 6e-3, epochs=4)
+    # RunRoles(roles, 'My lord Sebastian')

@@ -70,16 +70,23 @@ def MambaBlock(**kwargs):
         (delta, B, C) = x_dbl.split(split_size=[self.dt_rank, self.num_states, self.num_states], dim=-1)  # delta: (b, l, dt_rank). B, C: (b, l, n)
         delta = np.softplus(self.dt_proj(delta))  # (b, l, hidden_dim)
         # y, ssm_state = ssm(y, delta, A, B, C, D, self.num_heads, ssm_state)  # This is similar to run_SSM(A, B, C, u) in The Annotated S4 [2]
-        deltaA = np.einsum('blh,hn->blhn', delta, A).unsqueeze(-2)                # -> [B, L, h, n]
+        deltaA = np.einsum('blh,hn->blhn', delta, A).unsqueeze(-2)                # -> [B, L, h, d, n]
         y = np.rearrange('b l (h d)->b l h d', y, h=self.num_heads)
         deltaB = np.einsum('blh,bln,blhd->blhdn', delta, B, y)
 
         # -- RNN --
-        cumA = np.exp(np.cumsum(deltaA, dim=1))
-        mask = np.tril(np.ones(l, l, device=x.device))
-        shiftA = np.pad(cumA, (0, 0, 0, 0, 0, 0, 1, -1), value=1.0)
-        shiftB = np.cat([ssm_state.unsqueeze(1), deltaB[:,:l-1]], dim=1) / (1e-10+shiftA)
-        S = np.einsum('blhdn,lm,bmhdn->blhdn', cumA, mask, shiftB) + deltaB
+        if False:# Approximate version and faster. May cause vanishing gradient
+            cumA = np.exp(np.cumsum(deltaA, dim=1))
+            mask = np.tril(np.ones(l, l, device=x.device))
+            shiftA = np.pad(cumA, (0, 0, 0, 0, 0, 0, 1, -1), value=1.0)
+            shiftB = np.cat([ssm_state.unsqueeze(1), deltaB[:,:l-1]], dim=1) / (1e-10+shiftA)
+            S = np.einsum('blhdn,lm,bmhdn->blhdn', cumA, mask, shiftB) + deltaB
+        else: # Accurate Version, May cause [B,L,L,H] memory alloc
+            mask = np.tril(np.ones(l, l, device=x.device))[:,:,None,None,None]   #[l,m,h,d,n]
+            cumA = deltaA.unsqueeze(2) * mask                   #[b,l,1,h,d,n]
+            cumA = np.exp(np.cumsum(cumA, dim=1)) * mask        #[b,l,m,h,d,n]
+            shiftB = np.cat([ssm_state.unsqueeze(1), deltaB[:,:l-1]], dim=1)
+            S = np.einsum('blmhdn,bmhdn->blhdn', cumA, shiftB) + deltaB
         # -- RNN --
 
         ssm_state = S[:,-1]
