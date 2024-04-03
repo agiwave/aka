@@ -7,7 +7,7 @@ import aka.nn as nn
 import aka.repo as repo
 import aka.data
 
-def TrainRoles(roles, *, repo_name='data/bookcorpus', tokenizer=None, lr=1.e-4, epochs=1):
+def TrainRoles(roles, *, repo_name='data/bookcorpus', tokenizer=None, vocab_size=None, lr=1.e-4, epochs=1):
     # -- Tokenizer --
     if tokenizer is None:
         tokenizer = repo.AutoTokenizer(repo_name)
@@ -32,7 +32,7 @@ def TrainRoles(roles, *, repo_name='data/bookcorpus', tokenizer=None, lr=1.e-4, 
         args = getattr(module, module_name+'Args')(sub_name)
         args.update(dict(
             tokenizer = tokenizer,
-            vocab_size = 50304, #tokenizer.vocab_size,
+            vocab_size = vocab_size if vocab_size is not None else tokenizer.vocab_size,
             dropout = 0.1,
             bias = False
         ))
@@ -74,7 +74,7 @@ def TrainRoles(roles, *, repo_name='data/bookcorpus', tokenizer=None, lr=1.e-4, 
     plt.legend([r.name for r in roles], loc='upper right')
     plt.show()
 
-def RunRoles(names, prompt, *, repo_name='data/bookcorpus', tokenizer=None):
+def RunRoles(names, prompt, *, repo_name='data/bookcorpus', tokenizer=None, vocab_size=None):
     # -- Tokenizer --
     if tokenizer is None:
         tokenizer = repo.AutoTokenizer(repo_name)
@@ -88,7 +88,7 @@ def RunRoles(names, prompt, *, repo_name='data/bookcorpus', tokenizer=None):
         args = getattr(module, module_name+'Args')(sub_name)
         args.update(dict(
             tokenizer = tokenizer,
-            vocab_size = 50304, # tokenizer.vocab_size,
+            vocab_size = vocab_size if vocab_size is not None else tokenizer.vocab_size,
             dropout = 0.1,
             bias = False
         ))

@@ -194,5 +194,5 @@ if __name__ == "__main__":
         'Hawk-HawkOnly',
         # 'Hawk-SSMOnly',
     ]
-    TrainRoles(roles, repo_name='data/bookcorpus', lr = 6e-3, epochs=10)
+    TrainRoles(roles, repo_name='data/bookcorpus', vocab_size=50304, lr = 6e-3, epochs=1)
     # RunRoles(roles, 'My lord Sebastian')
