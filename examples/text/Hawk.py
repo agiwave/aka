@@ -119,7 +119,7 @@ def HawkArgs(name):
                 layers = [dict(
                     name = 'Hawk',
                     num_heads = 8
-                )]*16,
+                )]*48,
             )
         case 'Griffin':
             return dict(
@@ -177,9 +177,9 @@ if __name__ == "__main__":
         # 'Hawk-Hawk',
         # 'Hawk-Mamba',
         # 'Hawk-Griffin',
-        'Hawk-RWKV',
-        # 'Hawk-HawkOnly',
+        # 'Hawk-RWKV',
+        'Hawk-HawkOnly',
         # 'Hawk-SSMOnly',
     ]
-    TrainRoles(roles, lr = 6e-3, epochs=1)
+    TrainRoles(roles, lr = 6e-3, epochs=10)
     # RunRoles(roles, 'My lord Sebastian')
