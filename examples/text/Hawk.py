@@ -65,17 +65,24 @@ def HawkBlock(**kwargs):
         gru_state = gru_state if gru_state is not None else np.zeros(b, 1, self.num_heads, self.hidden_dim//self.num_heads, device=x.device)
 
         # ---- RNN --->
-        if False: # Approximate version and faster. May cause vanishing gradient
+        if True: # Trunc-Wise Implementation, Walk around for L*L complexity.
+            (begin, step) = (0, 128)
+            mask = np.tril(np.ones(step, step, device=x.device))[:,:,None,None]   #[l,h,d]
+            while begin < l:
+                end = begin + step if l-begin>step else l
+                maskA = mask[:end-begin,:end-begin]
+                truncA, truncX = [item[:, begin:end] for item in [rg, x]]
+                cumA = truncA.unsqueeze(2) * maskA                   #[b,l,1,h,d]
+                cumA = np.exp(np.cumsum(cumA, dim=1)) * maskA        #[b,l,m,h,d]
+                shiftB = np.cat([gru_state, truncX[:,:end-begin-1]], dim=1)
+                x[:,begin:end] = np.einsum('blmhd,bmhd->blhd', cumA, shiftB) + truncX
+                gru_state = x[:,end-1:end]
+                begin = end
+        elif False: # Approximate version and faster. May cause vanishing gradient
             cumA = np.exp(np.cumsum(rg, dim=1))
             shiftA = np.pad(cumA, (0, 0, 0, 0, 1, -1), value=1.0)
             shiftB = np.cat([gru_state, x[:,:l-1]], dim=1) / (1e-10+shiftA)
             x = np.einsum('blhd,lm,bmhd->blhd', cumA, mask, shiftB) + x
-        else: # Accurate Version, May cause [B,L,L,H] memory alloc
-            mask = np.tril(np.ones(l, l, device=x.device))[:,:,None,None]   #[l,h,d]
-            cumA = rg.unsqueeze(2) * mask                   #[b,l,1,h,d]
-            cumA = np.exp(np.cumsum(cumA, dim=1)) * mask    #[b,l,m,h,d]
-            shiftB = np.cat([gru_state, x[:,:l-1]], dim=1)
-            x = np.einsum('blmhd,bmhd->blhd', cumA, shiftB) + x
         # <--- RNN ----
 
         if state is not None:
@@ -125,7 +132,7 @@ def HawkArgs(name):
                 layers = [dict(
                     name = 'Hawk',
                     num_heads = 8
-                )]*48,
+                )]*16,
             )
         case 'Griffin':
             return dict(
