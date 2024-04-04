@@ -190,11 +190,11 @@ def DragonflyArgs(name):
 if __name__ == "__main__":
     from RomeArena import TrainRoles, RunRoles
     roles = [
-        # 'Dragonfly-tiny',
+        'Dragonfly-tiny',
         # 'Dragonfly-8m',
         # 'Dragonfly-20m',
         # 'Dragonfly-70m',
-        'Dragonfly-200m',
+        # 'Dragonfly-200m',
     ]
-    TrainRoles(roles, data_dir='data/pretrain', model_dir='data/RomeArena', lr=6e-3, epochs=1)
+    TrainRoles(roles, data_repo='text', data_dir='data/bookcorpus', model_dir='data/RomeArena', lr=6e-3, epochs=1)
     # RunRoles(roles, '在黄沙莽莽的回疆大漠', data_dir='data/pretrain', model_dir='data/RomeArena')

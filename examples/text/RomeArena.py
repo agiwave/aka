@@ -7,7 +7,7 @@ import aka.nn as nn
 import aka.repo as repo
 import aka.data
 
-def TrainRoles(roles, *, data_dir='data/pretrain', model_dir='data/RomeArena', save_dir=None, batch_size=6, lr=1.e-4, epochs=1):
+def TrainRoles(roles, *, data_repo='text', data_dir='data/pretrain', model_dir='data/RomeArena', save_dir=None, batch_size=6, lr=1.e-4, epochs=1):
     # -- Tokenizer --
     tokenizer = repo.AutoTokenizer(model_dir)
     if save_dir is None:
@@ -47,7 +47,7 @@ def TrainRoles(roles, *, data_dir='data/pretrain', model_dir='data/RomeArena', s
         role.persist_filename = f"{save_dir}/{role.name}.ckt"
 
     # -- Data loader
-    dataset = repo.AutoDataset('text', data_dir=data_dir, split='train')
+    dataset = repo.AutoDataset(data_repo, data_dir=data_dir, split='train')
     dataloader = aka.data.TextStreamingLoader(
                     dataset, 
                     tokenizer=tokenizer, 
