@@ -25,24 +25,16 @@ if __name__ == "__main__":
     import aka.repo as repo
     datasets = repo.AutoDataset('mnist')
     def collate_fn(items):
-        inputs = np.stack([np.array(item['image'], dtype=np.float) / 255 for item in items], dim=0)
-        targets = np.array([item['label'] for item in items])
+        inputs = np.stack([np.array(item[0], dtype=np.float) / 255 for item in items], dim=0)
+        targets = np.array([item[1] for item in items])
         return inputs, targets 
 
     losses = nn.train(
-        LeNet(num_classes=10), 
+        MNIST(num_classes=10), 
         datasets,
         collate_fn=collate_fn,
         loss_metric=nn.CrossEntropyLoss(), 
         batch_size=64, epochs=5)
-
-    # import aka.data as datasets
-    # losses = nn.train(
-    #             MNIST(), datasets.MNIST(),
-    #             loss_metric=nn.CrossEntropyLoss(), 
-    #             batch_size=600, epochs=1)
-
-
 
     from matplotlib import pyplot as plt
     plt.plot(losses)
