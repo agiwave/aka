@@ -7,10 +7,12 @@ import aka.nn as nn
 import aka.repo as repo
 import aka.data
 
-def TrainRoles(roles, *, repo_name='data/bookcorpus', tokenizer=None, vocab_size=None, lr=1.e-4, epochs=1):
+def TrainRoles(roles, *, data_dir='data/pretrain', model_dir='data/RomeArena', save_dir=None, batch_size=6, lr=1.e-4, epochs=1):
     # -- Tokenizer --
-    if tokenizer is None:
-        tokenizer = repo.AutoTokenizer(repo_name)
+    tokenizer = repo.AutoTokenizer(model_dir)
+    if save_dir is None:
+        save_dir = model_dir
+
     # class Tokenizer:
     #     def __init__(self, path):
     #         from sentencepiece import SentencePieceProcessor
@@ -22,17 +24,19 @@ def TrainRoles(roles, *, repo_name='data/bookcorpus', tokenizer=None, vocab_size
     #     def decode(self, s):
     #         return self.tokenizer.decode(s)
     # vocab_size = 256000
-    
+    vocab_size = tokenizer.vocab_size
+    vocab_size += 0 if not hasattr(tokenizer, 'added_tokens_decoder') else len(tokenizer.added_tokens_decoder)
+    vocab_size += 0 if not hasattr(tokenizer, 'added_tokens_encoder') else len(tokenizer.added_tokens_encoder)
     # -- Roles --
     roles = [nn.Object(name=name) for name in roles]
     import importlib
     for role in roles:
         module_name, sub_name = role.name.split('-')
-        module = importlib.import_module(module_name)
-        args = getattr(module, module_name+'Args')(sub_name)
+        module = importlib.import_module(f"examples.text.{module_name}")
+        args = getattr(module, f"{module_name}Args")(sub_name)
         args.update(dict(
             tokenizer = tokenizer,
-            vocab_size = vocab_size if vocab_size is not None else tokenizer.vocab_size,
+            vocab_size = vocab_size,
             dropout = 0.1,
             bias = False
         ))
@@ -40,20 +44,20 @@ def TrainRoles(roles, *, repo_name='data/bookcorpus', tokenizer=None, vocab_size
             args['vocab_dim'] = 64
 
         role.args = args
-        role.persist_filename = 'data/RomeArena/'+role.name+".ckt"
+        role.persist_filename = f"{save_dir}/{role.name}.ckt"
 
     # -- Data loader
-    dataset = repo.AutoDataset('text', data_dir=repo_name, split='train')
+    dataset = repo.AutoDataset('text', data_dir=data_dir, split='train')
     dataloader = aka.data.TextStreamingLoader(
                     dataset, 
                     tokenizer=tokenizer, 
                     n_tokens=512,
-                    batch_size=6,
+                    batch_size=batch_size,
                     data_mapper=lambda x:x['text'])
 
     # -- Train --
     def train(role, **kwargs):
-        from CausalLM import CausalLM
+        from examples.text.CausalLM import CausalLM
         return nn.train(
             CausalLM(**role.args), 
             data_loader=dataloader,
@@ -74,28 +78,33 @@ def TrainRoles(roles, *, repo_name='data/bookcorpus', tokenizer=None, vocab_size
     plt.legend([r.name for r in roles], loc='upper right')
     plt.show()
 
-def RunRoles(names, prompt, *, repo_name='data/bookcorpus', tokenizer=None, vocab_size=None):
+def RunRoles(names, prompt, *, data_dir='data/bookcorpus', model_dir='data/RomeArena', save_dir=None):
     # -- Tokenizer --
-    if tokenizer is None:
-        tokenizer = repo.AutoTokenizer(repo_name)
+    tokenizer = repo.AutoTokenizer(model_dir)
+    if save_dir is None:
+        save_dir = model_dir
+
+    vocab_size = tokenizer.vocab_size
+    vocab_size += 0 if not hasattr(tokenizer, 'added_tokens_decoder') else len(tokenizer.added_tokens_decoder)
+    vocab_size += 0 if not hasattr(tokenizer, 'added_tokens_encoder') else len(tokenizer.added_tokens_encoder)
 
     # -- Roles --
     roles = [nn.Object(name=name) for name in names]
     import importlib
     for role in roles:
         module_name, sub_name = role.name.split('-')
-        module = importlib.import_module(module_name)
-        args = getattr(module, module_name+'Args')(sub_name)
+        module = importlib.import_module(f"examples.text.{module_name}")
+        args = getattr(module, f"{module_name}Args")(sub_name)
         args.update(dict(
             tokenizer = tokenizer,
-            vocab_size = vocab_size if vocab_size is not None else tokenizer.vocab_size,
+            vocab_size = vocab_size,
             dropout = 0.1,
             bias = False
         ))
         if not 'vocab_dim' in args:
             args['vocab_dim'] = 64
         role.args = args
-        role.persist_filename = 'data/RomeArena/'+role.name+".ckt"
+        role.persist_filename = f"{save_dir}/{role.name}.ckt"
 
     # -- Run --
     for role in roles:
