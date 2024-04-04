@@ -174,6 +174,16 @@ def DragonflyArgs(name):
                     num_heads = 64,
                 )]*48
             )
+        case '200m':
+            return dict(
+                args,
+                latent_dim = 8192,
+                layers = [dict(
+                    name = 'Dragonfly',
+                    hidden_dim = 8192*2,
+                    num_heads = 128,
+                )]*64
+            )
         case _:
             assert False
 
@@ -183,7 +193,8 @@ if __name__ == "__main__":
         # 'Dragonfly-tiny',
         # 'Dragonfly-8m',
         # 'Dragonfly-20m',
-        'Dragonfly-70m',
+        # 'Dragonfly-70m',
+        'Dragonfly-200m',
     ]
     TrainRoles(roles, data_dir='data/pretrain', model_dir='data/RomeArena', lr=6e-3, epochs=1)
-    # RunRoles(roles, '在黄沙莽莽的回疆大漠',data_dir='data/pretrain', model_dir='data/RomeArena')
+    # RunRoles(roles, '在黄沙莽莽的回疆大漠', data_dir='data/pretrain', model_dir='data/RomeArena')
