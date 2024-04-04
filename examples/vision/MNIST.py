@@ -23,7 +23,6 @@ def MNIST(num_channels=1, num_classes=10):
 if __name__ == "__main__":
     import aka.numpy as np
     import aka.repo as repo
-    datasets = repo.AutoDataset('mnist')
     def collate_fn(items):
         inputs = np.stack([np.array(item[0], dtype=np.float) / 255 for item in items], dim=0)
         targets = np.array([item[1] for item in items])
@@ -31,7 +30,7 @@ if __name__ == "__main__":
 
     losses = nn.train(
         MNIST(num_classes=10), 
-        datasets,
+        repo.AutoDataset('mnist'),
         collate_fn=collate_fn,
         loss_metric=nn.CrossEntropyLoss(), 
         batch_size=64, epochs=5)
