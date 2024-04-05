@@ -134,16 +134,6 @@ def HawkArgs(name):
                     num_heads = 8
                 )]*48,
             )
-        case 'Hawk100m':
-            args['latent_dim'] = 768
-            args['vocab_dim'] = 64
-            return dict(
-                args,
-                layers = [dict(
-                    name = 'Hawk',
-                    num_heads = 16
-                )]*48,
-            )
         case 'Griffin':
             return dict(
                 args,
@@ -155,10 +145,20 @@ def HawkArgs(name):
                         rotary_embedding = True,
                     ),
                     dict(
+                        name = 'MLP',
+                        k_size = args['latent_dim']*3,
+                        kv_gate = True
+                    ),
+                    dict(
                         name = 'Hawk',
                         num_heads = 8,
                     ),
-                ]*8,
+                    dict(
+                        name = 'MLP',
+                        k_size = args['latent_dim']*3,
+                        kv_gate = True
+                    ),
+                ]*4,
             )
         case 'Mamba':
             return dict(
@@ -197,13 +197,13 @@ def HawkArgs(name):
 if __name__ == "__main__":
     from RomeArena import TrainRoles, RunRoles
     roles = [
-        # 'Hawk-Hawk',
+        'Hawk-Hawk',
         # 'Hawk-Mamba',
         # 'Hawk-Griffin',
+        # 'Hawk-HawkOnly',
         # 'Hawk-RWKV',
-        'Hawk-HawkOnly',
         # 'Hawk-Hawk100m',
         # 'Hawk-SSMOnly',
     ]
-    TrainRoles(roles, data_repo='text', data_repo_kwargs={'data_dir':'data/pretrain', 'split':'train'}, model_repo='data/RomeArena', lr = 6e-3, epochs=1)
-    # RunRoles(roles, 'My lord Sebastian',data_repo='data/bookcorpus', model_repo='data/RomeArena')
+    TrainRoles(roles, lr = 6e-3, epochs=1, show=True)
+    # RunRoles(roles, 'My lord Sebastian')

@@ -7,11 +7,11 @@ def CurvefitBlock(**kwargs):
         self.cache_key = cache_key
         match n:
             case 2:
-                self.conv_kernel = np.array([[[-1.0, 2.0]]])
+                self.conv_kernel = np.Parameter(np.array([[[-1.0, 2.0]]]))
             case 3:
-                self.conv_kernel = np.array([[[1.0, -3.0, 3.0]]])
+                self.conv_kernel = np.Parameter(np.array([[[1.0, -3.0, 3.0]]]))
             case 4:
-                self.conv_kernel = np.array([[[-1.0, 3.0, -5.0, 4.0]]])
+                self.conv_kernel = np.Parameter(np.array([[[-1.0, 3.0, -5.0, 4.0]]]))
             case _:
                 assert False
         return self
