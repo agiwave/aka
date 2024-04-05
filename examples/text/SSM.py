@@ -71,7 +71,7 @@ def SSMBlock(**kwargs):
         ssm_state = None if state is None else state.get('ssm_state',None)
         (t, ssm_state) = ssm_state if ssm_state is not None else (
             0,      # t
-            np.zeros(b, 1, self.num_heads, self.k_dim//self.num_heads, d//self.num_heads, device=x.device)
+            np.zeros(b, 1, self.num_heads, self.k_dim//self.num_heads, d//self.num_heads, dtype=x.dtype, device=x.device)
         )
 
         C = np.softmax(np.rearrange('b l (h k)->b l h k', C, h=self.num_heads), dim=-1)
@@ -92,7 +92,7 @@ def SSMBlock(**kwargs):
 
         # -- RNN --
         (begin, step) = (0, 64)
-        mask = np.tril(np.ones(step, step, device=x.device))[:,:,None,None,None]   #[l,h,k,d]
+        mask = np.tril(np.ones(step, step, dtype=x.dtype, device=x.device))[:,:,None,None,None]   #[l,h,k,d]
         while begin < l:
             end = begin + step if l-begin>step else l
             trilMask = mask[:end-begin, :end-begin]

@@ -92,7 +92,7 @@ def RWKV_Tmix_x060(**kwargs):
             w = w.view(B, T, self.n_head, -1)
             k = k.view(B, T, self.n_head, -1)
             # wkv = (np.einsum('htu,buhc->bthc', w, kv)).contiguous().view(B, T, -1)
-            mask = np.tril(np.ones(T,T, device=x.device))
+            mask = np.tril(np.ones(T,T, dtype=x.dtype, device=x.device))
             wkv = (np.einsum('bthc,tu,buhc->bthc', w, mask, kv)).contiguous().view(B, T, -1)
             wk = (np.einsum('bthc,tu,buhc->bthc', w, mask, k)).contiguous().view(B, T, -1)
             x = np.sigmoid(r) * wkv / wk

@@ -43,12 +43,12 @@ def MambaBlock(**kwargs):
                 conv_state = state['conv_state']
                 ssm_state = state['ssm_state']
             else:
-                conv_state = np.zeros(b, self.hidden_dim, n_conv_state, device=x.device)
-                ssm_state = np.zeros(b, 1, self.num_heads, self.hidden_dim//self.num_heads, self.num_states, device=x.device)
+                conv_state = np.zeros(b, self.hidden_dim, n_conv_state, dtype=x.dtype, device=x.device)
+                ssm_state = np.zeros(b, 1, self.num_heads, self.hidden_dim//self.num_heads, self.num_states, dtype=x.dtype, device=x.device)
             x = np.cat((conv_state, x), dim=2)
         else:
             n_conv_state = 0
-            ssm_state = np.zeros(b, 1, self.num_heads, self.hidden_dim//self.num_heads, self.num_states, device=x.device)
+            ssm_state = np.zeros(b, 1, self.num_heads, self.hidden_dim//self.num_heads, self.num_states, dtype=x.dtype, device=x.device)
 
         # -- Conv --
         if x.size(2) < l + n_conv_state:
@@ -76,7 +76,7 @@ def MambaBlock(**kwargs):
 
         # -- Trunc-Wise RNN --
         (begin, step) = (0, 64)
-        mask = np.tril(np.ones(step, step, device=x.device))[:,:,None,None,None]   #[l,h,k,d]
+        mask = np.tril(np.ones(step, step, dtype=x.dtype, device=x.device))[:,:,None,None,None]   #[l,h,k,d]
         while begin < l:
             end = begin + step if l-begin>step else l
             maskA = mask[:end-begin,:end-begin]

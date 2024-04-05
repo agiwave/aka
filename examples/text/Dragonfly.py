@@ -90,12 +90,12 @@ def DragonflyBlock(**kwargs):
             irg = rg
         x = (1-np.exp(irg)) * np.sigmoid(igg) * x # The orginal paper: np.sqrt(1-rg**2)*np.sigmoid(ig).unsqueeze(-1) * x
         gru_state = None if state is None else state.get('gru_state',None)
-        gru_state = gru_state if gru_state is not None else np.zeros(b, 1, self.num_heads, self.hidden_dim//self.num_heads, device=x.device)
+        gru_state = gru_state if gru_state is not None else np.zeros(b, 1, self.num_heads, self.hidden_dim//self.num_heads, dtype=x.dtype, device=x.device)
 
         # ---- RNN --->
         if True: # Trunc-Wise Implementation, Walk around for L*L complexity.
             (begin, step) = (0, 128)
-            mask = np.tril(np.ones(step, step, device=x.device))[:,:,None,None]   #[l,h,d]
+            mask = np.tril(np.ones(step, step, dtype=x.dtype, device=x.device))[:,:,None,None]   #[l,h,d]
             while begin < l:
                 end = begin + step if l-begin>step else l
                 truncM = mask[:end-begin,:end-begin]
@@ -196,5 +196,5 @@ if __name__ == "__main__":
         # 'Dragonfly-70m',
         # 'Dragonfly-200m',
     ]
-    TrainRoles(roles, lr=6e-3, epochs=1)
+    TrainRoles(roles, lr=6e-3, epochs=1, dtype=np.bfloat16)
     # RunRoles(roles, '在黄沙莽莽的回疆大漠')

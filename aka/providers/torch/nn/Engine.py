@@ -25,7 +25,7 @@ def train(
         persist_filename = None, 
         persist_per_batchs = None,
         shuffle = True,
-        batch_size = 1,
+        batch_size = 8,
         epochs = 1,
         show_chart = False, **kwargs):
 
@@ -144,10 +144,13 @@ def Trainer(
     loss_metric = None,
     forward_kwargs={},
     epochs=2,
+    dtype=None,
     **kwargs):
 
     device = torch.device("cpu") if not torch.cuda.is_available() else torch.device("cuda:0")
     model = model.to(device)
+    if dtype is not None:
+        model = model.to(dtype)
 
     # -- Train Variables --
     train_mode = 0  # 0 -- Uninitialized, 2 -- With loss --, 3 -- Dict loss --
@@ -175,6 +178,10 @@ def Trainer(
 
             inputs = inputs.to(device)
             targets = targets.to(device)
+            if dtype is not None:
+                inputs = inputs.to(dtype)
+                targets = targets.to(dtype)
+
             if loss_metric is None:
                 (outputs, loss) = model(inputs, targets=targets, **forward_kwargs)
             else:

@@ -62,12 +62,12 @@ def HawkBlock(**kwargs):
         x = np.rearrange('b l (h d)->b l h d', x, h=self.num_heads) # [B,L,H,D]
         x = (1-np.exp(rg)) * np.sigmoid(ig).unsqueeze(-1) * x # The orginal paper: np.sqrt(1-rg**2)*np.sigmoid(ig).unsqueeze(-1) * x
         gru_state = None if state is None else state.get('gru_state',None)
-        gru_state = gru_state if gru_state is not None else np.zeros(b, 1, self.num_heads, self.hidden_dim//self.num_heads, device=x.device)
+        gru_state = gru_state if gru_state is not None else np.zeros(b, 1, self.num_heads, self.hidden_dim//self.num_heads, dtype=x.dtype, device=x.device)
 
         # ---- RNN --->
         if True: # Trunc-Wise Implementation, Walk around for L*L complexity.
             (begin, step) = (0, 128)
-            mask = np.tril(np.ones(step, step, device=x.device))[:,:,None,None]   #[l,h,d]
+            mask = np.tril(np.ones(step, step, dtype=x.dtype, device=x.device))[:,:,None,None]   #[l,h,d]
             while begin < l:
                 end = begin + step if l-begin>step else l
                 maskA = mask[:end-begin,:end-begin]

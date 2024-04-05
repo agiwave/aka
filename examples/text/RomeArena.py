@@ -7,12 +7,12 @@ import aka.nn as nn
 import aka.repo as repo
 import aka.data
 
-def TrainRoles(roles, *, dataset=dict(path='text', data_dir='data/pretrain', split='train'), tokenizer='data/RomeArena', save_dir="data/RomeArena", batch_size=6, lr=1.e-4, epochs=1):
+def TrainRoles(roles, *, dataset=dict(path='text', data_dir='data/pretrain', split='train'), tokenizer='data/RomeArena', save_dir="data/RomeArena", batch_size=6, lr=1.e-4, dtype=None, **kwargs):
     # -- dataset --
     if isinstance(dataset, str):
-        dataset = repo.AutoDataset(dataset, split='train')
+        dataset = repo.AutoDataset(dataset)
     elif isinstance(dataset, dict):
-        dataset = repo.AutoDataset(**dataset, split='train')
+        dataset = repo.AutoDataset(**dataset)
     # -- Tokenizer --
     if isinstance(tokenizer, str):
         tokenizer = repo.AutoTokenizer(tokenizer)
@@ -61,18 +61,21 @@ def TrainRoles(roles, *, dataset=dict(path='text', data_dir='data/pretrain', spl
     # -- Train --
     def train(role, **kwargs):
         from examples.text.CausalLM import CausalLM
+        m = CausalLM(**role.args)
+        if dtype is not None:
+            m = m.to(dtype)
         return nn.train(
-            CausalLM(**role.args), 
+            m, 
             data_loader=dataloader,
             optimizer="Adam",
             optimizer_kwargs={'lr':lr},
             forward_kwargs={'state':{}},
             persist_filename = role.persist_filename,
             persist_per_batchs = 50,
-            epochs=epochs)
+            **kwargs)
 
     # -- Plot --
-    m_losses = [train(r) for r in roles]
+    m_losses = [train(r, **kwargs) for r in roles]
     from matplotlib import pyplot as plt
     for v in m_losses:
         plt.plot(v)
