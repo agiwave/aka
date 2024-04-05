@@ -44,14 +44,19 @@ def TrainRoles(roles, *, dataset=dict(path='text', data_dir='data/pretrain', spl
                 args = dict(
                     args,
                     tokenizer = tokenizer,
-                    vocab_size = vocab_size,
-                    dropout = 0.1,
-                    bias = False
+                    vocab_size = vocab_size
                 ),
                 persist_filename = None if save_dir is None else f"{save_dir}/{sub_name}.ckt"
             ))
         else:
-            players.append(role)
+            players.append(dict(
+                args = dict(
+                    role,
+                    tokenizer = tokenizer,
+                    vocab_size = vocab_size,
+                ),
+                persist_filename = None if save_dir is None else f"{save_dir}/{role['name']}.ckt"
+            ))
 
     # -- Data loader
     dataloader = aka.data.TextStreamingLoader(
@@ -114,7 +119,14 @@ def RunRoles(names, prompt, *, tokenizer='data/RomeArena', save_dir='data/RomeAr
                 persist_filename = None if save_dir is None else f"{save_dir}/{sub_name}.ckt"
             ))
         else:
-            players.append(role)
+            players.append(dict(
+                args = dict(
+                    role,
+                    tokenizer = tokenizer,
+                    vocab_size = vocab_size,
+                ),
+                persist_filename = None if save_dir is None else f"{save_dir}/{role['name']}.ckt"
+            ))
 
     # -- Run --
     for role in players:

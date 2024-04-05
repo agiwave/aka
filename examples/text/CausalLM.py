@@ -48,7 +48,7 @@ def CausalLM(**kwargs):
         self.embedding = nn.Embedding(num_embeddings=args.vocab_size, embedding_dim=self.vocab_dim)
 
         make_layer = MetaLayer if not hasattr(args, 'MetaLayer') else args.MetaLayer
-        self.layers = nn.ModuleList([make_layer(**dict(layer,**kwargs)) for layer in args.layers])
+        self.layers = nn.ModuleList([make_layer(**dict(kwargs, **layer)) for layer in args.layers])
         self.lm_head = None if not getattr(args, 'lm_head', False) else nn.Linear(self.vocab_dim, args.vocab_size,bias=False)
 
         prev_norm = getattr(args, 'prev_norm', None)
