@@ -48,7 +48,7 @@ def GemmaArgs(name, tokenizer='data/Gemma/tokenizer.model'):
             attn_args['num_kv_groups'] = 1
             mlp_args['k_size'] = 16384
             args['layers'] = [attn_args, mlp_args]*18
-        case '8b':
+        case '7b':
             n_layers = 28
             args['latent_dim'] = 3072
             attn_args['num_heads'] = 16
