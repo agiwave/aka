@@ -8,11 +8,11 @@ def GemmaEmbNorm():
         forward = forward
     )
 
-def GemmaArgs(name):
+def GemmaArgs(name, tokenizer='data/Gemma/tokenizer.model'):
     class Tokenizer:
         def __init__(self, path):
             from sentencepiece import SentencePieceProcessor
-            self.tokenizer = SentencePieceProcessor('data/Gemma/tokenizer.model')
+            self.tokenizer = SentencePieceProcessor(path)
             self.bos_token_id = self.tokenizer.bos_id()
             self.eos_token_id = self.tokenizer.eos_id()
         def encode(self, s):
@@ -33,7 +33,7 @@ def GemmaArgs(name):
         rotary_embedding = True,
     )
     args = dict(
-        tokenizer = Tokenizer('data/Gemma/tokenizer.model'),
+        tokenizer = Tokenizer(tokenizer),
         vocab_size = 256000,
         latent_dim = 2048,
         prev_norm = 'gemma',
