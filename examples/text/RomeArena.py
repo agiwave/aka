@@ -48,7 +48,7 @@ def TrainRoles(roles, *, dataset=None, tokenizer='data/RomeArena', save_dir="dat
                     tokenizer = tokenizer,
                     vocab_size = vocab_size
                 ),
-                persist_filename = None if save_dir is None else f"{save_dir}/{sub_name}.ckt"
+                persist_filename = None if save_dir is None else f"{save_dir}/{role}.ckt"
             ))
         else:
             players.append(dict(
