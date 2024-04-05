@@ -71,8 +71,8 @@ def AttentionBlock(**kwargs):
         y = np.einsum('bnldc->blncd', y)
         return np.reshape(y, (B,L,N,D))
 
-    def causal_mask(shape, dtype, *, window_size = None, from_bottomright: bool = False,):
-        mask = np.full(shape, dtype=dtype, fill_value=1)
+    def causal_mask(shape, dtype, device, *, window_size = None, from_bottomright: bool = False,):
+        mask = np.full(shape, dtype=dtype, device=device, fill_value=1)
         shift = 0 if not from_bottomright else shape[-1] - shape[-2] # q_len - k_len
         mask = np.tril(mask, diagonal=shift)
         if window_size is not None:
@@ -118,7 +118,7 @@ def AttentionBlock(**kwargs):
                 y = memory_efficient_attention(q,k,v, attn_bias=LowerTriangularFromBottomRightLocalAttentionMask(self.window_size))
         else:
             att = np.einsum('blnd,bmnd->bnlm', q, k) * self.scale_dk
-            att = att + causal_mask((L,M), q.dtype, window_size=self.window_size, from_bottomright=True)
+            att = att + causal_mask((L,M), q.dtype, q.device, window_size=self.window_size, from_bottomright=True)
             att = np.softmax(att, dim=-1)
             att = self.attn_dropout(att)
             y = np.einsum('bnlm,bmnd->blnd', att, v)
