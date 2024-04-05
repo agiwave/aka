@@ -43,6 +43,7 @@ def TrainRoles(roles, *, dataset=None, tokenizer='data/RomeArena', save_dir="dat
             module = importlib.import_module(f"examples.text.{module_name}")
             args = getattr(module, f"{module_name}Args")(sub_name)
             players.append(dict(
+                name = role,
                 args = dict(
                     args,
                     tokenizer = tokenizer,
@@ -116,6 +117,7 @@ def RunRoles(roles, prompt, *, tokenizer='data/RomeArena', save_dir='data/RomeAr
             module = importlib.import_module(f"examples.text.{module_name}")
             args = getattr(module, f"{module_name}Args")(sub_name)
             players.append(dict(
+                name = role,
                 args = dict(
                     args,
                     tokenizer = tokenizer,
@@ -123,7 +125,7 @@ def RunRoles(roles, prompt, *, tokenizer='data/RomeArena', save_dir='data/RomeAr
                     dropout = 0.1,
                     bias = False
                 ),
-                persist_filename = None if save_dir is None else f"{save_dir}/{sub_name}.ckt"
+                persist_filename = None if save_dir is None else f"{save_dir}/{role}.ckt"
             ))
         else:
             players.append(dict(
@@ -138,9 +140,9 @@ def RunRoles(roles, prompt, *, tokenizer='data/RomeArena', save_dir='data/RomeAr
     # -- Run --
     for role in players:
         from CausalLM import CausalLM
-        model = CausalLM(**players['args'])
+        model = CausalLM(**role['args'])
         nn.load_weights(model, role['persist_filename'])
-        print(role.name + ":")
+        print(f"{role['name']}:")
         for w in model.generator(prompt):
             print(w, end='')
         print('')

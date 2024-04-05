@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from torchinfo import summary
 
 def load_weights(model, filename):
-    model.load_state_dict(torch.load(filename))
+    model.load_state_dict(torch.load(filename, map_location=torch.device('cpu')))
     return model
     
 def save_weights(model, filename):

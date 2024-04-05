@@ -196,7 +196,7 @@ def HawkArgs(name):
             assert False
 
 if __name__ == "__main__":
-    from RomeArena import TrainRoles, RunRoles, Plot
+    from RomeArena import TrainRoles, RunRoles, PlotRoles
     roles = [
         'Hawk-Hawk',
         # 'Hawk-Mamba',
@@ -208,5 +208,5 @@ if __name__ == "__main__":
         # 'Hawk-300m'
     ]
     # PlotRoles(roles, np.load('examples/text/hawk-losses.ckt'))
-    TrainRoles(roles, lr = 6e-3, epochs=1, show=True)
-    # RunRoles(roles, 'My lord Sebastian')
+    # TrainRoles(roles, lr = 6e-3, epochs=1, show=True)
+    RunRoles(roles, 'My lord Sebastian')
