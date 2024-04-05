@@ -201,9 +201,9 @@ if __name__ == "__main__":
         # 'Hawk-Mamba',
         # 'Hawk-Griffin',
         # 'Hawk-RWKV',
-        # 'Hawk-HawkOnly',
-        'Hawk-Hawk100m',
+        'Hawk-HawkOnly',
+        # 'Hawk-Hawk100m',
         # 'Hawk-SSMOnly',
     ]
-    TrainRoles(roles,data_dir='data/bookcorpus', model_dir='data/RomeArena', lr = 6e-3, epochs=1)
-    # RunRoles(roles, 'My lord Sebastian',data_dir='data/bookcorpus', model_dir='data/RomeArena')
+    TrainRoles(roles, data_repo='text', data_repo_kwargs={'data_dir':'data/pretrain', 'split':'train'}, model_repo='data/RomeArena', lr = 6e-3, epochs=1)
+    # RunRoles(roles, 'My lord Sebastian',data_repo='data/bookcorpus', model_repo='data/RomeArena')

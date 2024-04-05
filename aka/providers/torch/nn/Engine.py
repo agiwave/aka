@@ -145,7 +145,10 @@ def Trainer(
     forward_kwargs={},
     epochs=2,
     **kwargs):
-    
+
+    device = torch.device("cpu") if not torch.cuda.is_available() else torch.device("cuda:0")
+    model = model.to(device)
+
     # -- Train Variables --
     train_mode = 0  # 0 -- Uninitialized, 2 -- With loss --, 3 -- Dict loss --
     ctx = TrainArgs(
@@ -169,6 +172,9 @@ def Trainer(
                 (inputs, targets) = item
             else:
                 (inputs, targets) = item[data_fields[0]], item[data_fields[1]]
+
+            inputs = inputs.to(device)
+            targets = targets.to(device)
             if loss_metric is None:
                 (outputs, loss) = model(inputs, targets=targets, **forward_kwargs)
             else:

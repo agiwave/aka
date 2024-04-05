@@ -196,5 +196,5 @@ if __name__ == "__main__":
         # 'Dragonfly-70m',
         # 'Dragonfly-200m',
     ]
-    TrainRoles(roles, data_repo='text', data_dir='data/bookcorpus', model_dir='data/RomeArena', lr=6e-3, epochs=1)
-    # RunRoles(roles, '在黄沙莽莽的回疆大漠', data_dir='data/pretrain', model_dir='data/RomeArena')
+    TrainRoles(roles, lr=6e-3, epochs=1)
+    # RunRoles(roles, '在黄沙莽莽的回疆大漠')

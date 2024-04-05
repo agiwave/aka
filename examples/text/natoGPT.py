@@ -139,10 +139,10 @@ def GPT(config):
 # --- Example ---
 if __name__ == "__main__":
     class PackedDataset:
-        def __init__(self, data_dir: str, block_size: int = 1024, filemode: str = "r") -> None:
+        def __init__(self, data_repo: str, block_size: int = 1024, filemode: str = "r") -> None:
             super().__init__()
 
-            with open(data_dir, 'r', encoding='utf-8') as f:
+            with open(data_repo, 'r', encoding='utf-8') as f:
                 data = f.read()
 
             # encode with tiktoken gpt2 bpe

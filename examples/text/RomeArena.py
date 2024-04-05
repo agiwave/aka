@@ -7,11 +7,15 @@ import aka.nn as nn
 import aka.repo as repo
 import aka.data
 
-def TrainRoles(roles, *, data_dir='data/bookcorpus', model_dir='data/RomeArena', save_dir=None, batch_size=6, lr=1.e-4, epochs=1):
+def TrainRoles(roles, *, dataset=dict(path='text', data_dir='data/pretrain', split='train'), tokenizer='data/RomeArena', save_dir="data/RomeArena", batch_size=6, lr=1.e-4, epochs=1):
+    # -- dataset --
+    if isinstance(dataset, str):
+        dataset = repo.AutoDataset(dataset, split='train')
+    elif isinstance(dataset, dict):
+        dataset = repo.AutoDataset(**dataset, split='train')
     # -- Tokenizer --
-    tokenizer = repo.AutoTokenizer(model_dir)
-    if save_dir is None:
-        save_dir = model_dir
+    if isinstance(tokenizer, str):
+        tokenizer = repo.AutoTokenizer(tokenizer)
 
     # class Tokenizer:
     #     def __init__(self, path):
@@ -44,10 +48,9 @@ def TrainRoles(roles, *, data_dir='data/bookcorpus', model_dir='data/RomeArena',
             args['vocab_dim'] = 64
 
         role.args = args
-        role.persist_filename = f"{save_dir}/{role.name}.ckt"
+        role.persist_filename = None if save_dir is None else f"{save_dir}/{role.name}.ckt"
 
     # -- Data loader
-    dataset = repo.AutoDataset(data_dir, split='train')
     dataloader = aka.data.TextStreamingLoader(
                     dataset, 
                     tokenizer=tokenizer, 
@@ -78,12 +81,10 @@ def TrainRoles(roles, *, data_dir='data/bookcorpus', model_dir='data/RomeArena',
     plt.legend([r.name for r in roles], loc='upper right')
     plt.show()
 
-def RunRoles(names, prompt, *, data_dir='data/bookcorpus', model_dir='data/RomeArena', save_dir=None):
+def RunRoles(names, prompt, *, tokenizer='data/RomeArena', save_dir='data/RomeArena'):
     # -- Tokenizer --
-    tokenizer = repo.AutoTokenizer(model_dir)
-    if save_dir is None:
-        save_dir = model_dir
-
+    if isinstance(tokenizer, str):
+        tokenizer = repo.AutoTokenizer(tokenizer)
     vocab_size = tokenizer.vocab_size
     vocab_size += 0 if not hasattr(tokenizer, 'added_tokens_decoder') else len(tokenizer.added_tokens_decoder)
     vocab_size += 0 if not hasattr(tokenizer, 'added_tokens_encoder') else len(tokenizer.added_tokens_encoder)
