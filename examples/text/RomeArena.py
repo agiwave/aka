@@ -31,24 +31,27 @@ def TrainRoles(roles, *, dataset=dict(path='text', data_dir='data/pretrain', spl
     vocab_size = tokenizer.vocab_size
     vocab_size += 0 if not hasattr(tokenizer, 'added_tokens_decoder') else len(tokenizer.added_tokens_decoder)
     vocab_size += 0 if not hasattr(tokenizer, 'added_tokens_encoder') else len(tokenizer.added_tokens_encoder)
+    
     # -- Roles --
-    roles = [nn.Object(name=name) for name in roles]
+    players = []
     import importlib
     for role in roles:
-        module_name, sub_name = role.name.split('-')
-        module = importlib.import_module(f"examples.text.{module_name}")
-        args = getattr(module, f"{module_name}Args")(sub_name)
-        args.update(dict(
-            tokenizer = tokenizer,
-            vocab_size = vocab_size,
-            dropout = 0.1,
-            bias = False
-        ))
-        if not 'vocab_dim' in args:
-            args['vocab_dim'] = 64
-
-        role.args = args
-        role.persist_filename = None if save_dir is None else f"{save_dir}/{role.name}.ckt"
+        if isinstance(role, str):
+            module_name, sub_name = role.split('-')
+            module = importlib.import_module(f"examples.text.{module_name}")
+            args = getattr(module, f"{module_name}Args")(sub_name)
+            players.append(dict(
+                args = dict(
+                    args,
+                    tokenizer = tokenizer,
+                    vocab_size = vocab_size,
+                    dropout = 0.1,
+                    bias = False
+                ),
+                persist_filename = None if save_dir is None else f"{save_dir}/{sub_name}.ckt"
+            ))
+        else:
+            players.append(role)
 
     # -- Data loader
     dataloader = aka.data.TextStreamingLoader(
@@ -61,7 +64,7 @@ def TrainRoles(roles, *, dataset=dict(path='text', data_dir='data/pretrain', spl
     # -- Train --
     def train(role, **kwargs):
         from examples.text.CausalLM import CausalLM
-        m = CausalLM(**role.args)
+        m = CausalLM(**role['args'])
         if dtype is not None:
             m = m.to(dtype)
         return nn.train(
@@ -70,12 +73,12 @@ def TrainRoles(roles, *, dataset=dict(path='text', data_dir='data/pretrain', spl
             optimizer="Adam",
             optimizer_kwargs={'lr':lr},
             forward_kwargs={'state':{}},
-            persist_filename = role.persist_filename,
+            persist_filename = role['persist_filename'],
             persist_per_batchs = 50,
             **kwargs)
 
     # -- Plot --
-    m_losses = [train(r, **kwargs) for r in roles]
+    m_losses = [train(r, **kwargs) for r in players]
     from matplotlib import pyplot as plt
     for v in m_losses:
         plt.plot(v)

@@ -13,6 +13,8 @@ def DragonflyBlock(**kwargs):
     '''
     def __init__(self, **kwargs):
         args = nn.Object(**kwargs)
+        bias = getattr(args, 'bias', False)
+        dropout = getattr(args, 'dropout', 0.2)
 
         self.num_heads = getattr(args, 'num_heads', 8)
         self.hidden_dim = getattr(args, 'hidden_dim', args.latent_dim)
@@ -49,6 +51,7 @@ def DragonflyBlock(**kwargs):
             groups=self.hidden_dim,
             padding=0
         )
+        self.dropout_v = nn.Dropout(dropout)
         self.c = nn.Parameter(np.array(-8.), requires_grad=False)
         self.delta = nn.Parameter(np.array(0.5))
         return self
@@ -122,6 +125,7 @@ def DragonflyBlock(**kwargs):
         x = x if not self.post_conv else conv(x, self.conv1d, self.conv_kernel_size, state, 'post_conv_state')
 
         # Gate and Output
+        x = x if self.dropout_v is None else self.dropout_v(x)
         x = x if self.vg_dim == 0 else np.gelu(vg) * x
         x = np.reshape(x, (b, l, -1, self.num_heads))
         x = np.einsum('b l v h , h d v -> b l h d', x, self.out_proj)
@@ -196,5 +200,5 @@ if __name__ == "__main__":
         # 'Dragonfly-70m',
         # 'Dragonfly-200m',
     ]
-    TrainRoles(roles, lr=6e-3, epochs=1, dtype=np.bfloat16)
+    TrainRoles(roles, lr=6e-3, epochs=1)
     # RunRoles(roles, '在黄沙莽莽的回疆大漠')
