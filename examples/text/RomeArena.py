@@ -96,28 +96,31 @@ def RunRoles(names, prompt, *, tokenizer='data/RomeArena', save_dir='data/RomeAr
     vocab_size += 0 if not hasattr(tokenizer, 'added_tokens_encoder') else len(tokenizer.added_tokens_encoder)
 
     # -- Roles --
-    roles = [nn.Object(name=name) for name in names]
+    players = []
     import importlib
     for role in roles:
-        module_name, sub_name = role.name.split('-')
-        module = importlib.import_module(f"examples.text.{module_name}")
-        args = getattr(module, f"{module_name}Args")(sub_name)
-        args.update(dict(
-            tokenizer = tokenizer,
-            vocab_size = vocab_size,
-            dropout = 0.1,
-            bias = False
-        ))
-        if not 'vocab_dim' in args:
-            args['vocab_dim'] = 64
-        role.args = args
-        role.persist_filename = f"{save_dir}/{role.name}.ckt"
+        if isinstance(role, str):
+            module_name, sub_name = role.split('-')
+            module = importlib.import_module(f"examples.text.{module_name}")
+            args = getattr(module, f"{module_name}Args")(sub_name)
+            players.append(dict(
+                args = dict(
+                    args,
+                    tokenizer = tokenizer,
+                    vocab_size = vocab_size,
+                    dropout = 0.1,
+                    bias = False
+                ),
+                persist_filename = None if save_dir is None else f"{save_dir}/{sub_name}.ckt"
+            ))
+        else:
+            players.append(role)
 
     # -- Run --
-    for role in roles:
+    for role in players:
         from CausalLM import CausalLM
-        model = CausalLM(**role.args)
-        nn.load_weights(model, role.persist_filename)
+        model = CausalLM(**players['args'])
+        nn.load_weights(model, role['persist_filename'])
         print(role.name + ":")
         for w in model.generator(prompt):
             print(w, end='')
