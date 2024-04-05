@@ -75,9 +75,9 @@ def GemmaArgs(name, tokenizer='data/Gemma/tokenizer.model'):
             assert False, f"Unknown Gemma name{name}"
     return args
 
-def Gemma(name, ckpt=None):
+def Gemma(name, ckpt=None, tokenizer='data/Gemma/tokenizer.model'):
     from CausalLM import CausalLM
-    m = CausalLM(**GemmaArgs(name))
+    m = CausalLM(**GemmaArgs(name,tokenizer))
     if ckpt is not None:
         state = np.load(
             ckpt, mmap=True, weights_only=True,
