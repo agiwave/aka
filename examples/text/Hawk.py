@@ -132,7 +132,7 @@ def HawkArgs(name):
                 layers = [dict(
                     name = 'Hawk',
                     num_heads = 8
-                )]*48,
+                )]*16,
             )
         case 'Griffin':
             return dict(
@@ -183,27 +183,30 @@ def HawkArgs(name):
                     )
                 ]*8,
             )
-        case 'SSMOnly':
+        case '300m':
             return dict(
                 args,
+                latent_dim = 1024,
                 layers = [dict(
-                    name = 'SSM',
-                    num_heads = 8,
-                )]*16,
+                    name = 'Hawk',
+                    num_heads = 16
+                )]*96,
             )
         case _:
             assert False
 
 if __name__ == "__main__":
-    from RomeArena import TrainRoles, RunRoles
+    from RomeArena import TrainRoles, RunRoles, Plot
     roles = [
         'Hawk-Hawk',
         # 'Hawk-Mamba',
-        # 'Hawk-Griffin',
-        # 'Hawk-HawkOnly',
-        # 'Hawk-RWKV',
+        'Hawk-Griffin',
+        'Hawk-HawkOnly',
+        'Hawk-RWKV',
         # 'Hawk-Hawk100m',
         # 'Hawk-SSMOnly',
+        # 'Hawk-300m'
     ]
+    # PlotRoles(roles, np.load('examples/text/hawk-losses.ckt'))
     TrainRoles(roles, lr = 6e-3, epochs=1, show=True)
     # RunRoles(roles, 'My lord Sebastian')

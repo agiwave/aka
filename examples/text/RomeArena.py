@@ -7,7 +7,7 @@ import aka.nn as nn
 import aka.repo as repo
 import aka.data
 
-def TrainRoles(roles, *, dataset=None, tokenizer='data/RomeArena', save_dir="data/RomeArena", batch_size=6, lr=1.e-4, dtype=None, show=False, **kwargs):
+def TrainRoles(roles, *, dataset=None, tokenizer='data/RomeArena', save_dir="data/RomeArena", block_size=512, batch_size=6, lr=1.e-4, dtype=None, show=False, **kwargs):
     # -- dataset --
     if dataset is None:
         dataset = repo.AutoDataset(path='text', data_dir='data/pretrain', split='train')
@@ -64,7 +64,7 @@ def TrainRoles(roles, *, dataset=None, tokenizer='data/RomeArena', save_dir="dat
     dataloader = aka.data.TextStreamingLoader(
                     dataset, 
                     tokenizer=tokenizer, 
-                    n_tokens=512,
+                    n_tokens=block_size,
                     batch_size=batch_size,
                     data_mapper=lambda x:x['text'])
 
@@ -87,16 +87,16 @@ def TrainRoles(roles, *, dataset=None, tokenizer='data/RomeArena', save_dir="dat
     # -- Plot --
     losses = [train(r, **kwargs) for r in players]
     if show:
-        Plot(players, losses)
+        Plot([r.name for r in players], losses)
     return losses
 
-def Plot(roles, losses):
+def PlotRoles(roles, losses):
     from matplotlib import pyplot as plt
     for v in losses:
         plt.plot(v)
     plt.xlabel('Iterators')
     plt.ylabel('Losses')
-    plt.legend([r.name for r in roles], loc='upper right')
+    plt.legend(roles, loc='upper right')
     plt.show()
 
 def RunRoles(roles, prompt, *, tokenizer='data/RomeArena', save_dir='data/RomeArena'):
