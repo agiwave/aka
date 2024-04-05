@@ -58,13 +58,13 @@ def AttentionBlock(**kwargs):
         freqs_cis = cache.get('freqs_cis', None)
         if freqs_cis is None or len(freqs_cis) < slen:
             """Precomputes the frequency cis."""
-            freqs = 1.0 / (10000**(np.arange(0, D, 2)[:(D // 2)].float() / D))
-            t = np.arange(slen, device=freqs.device)
-            freqs = np.outer(t, freqs).float()
+            freqs = 1.0 / (10000**(np.arange(0, D, 2, dtype=x.dtype, device=x.device)[:(D // 2)] / D))
+            t = np.arange(slen, dtype=x.dtype, device=x.device)
+            freqs = np.outer(t, freqs)
             freqs_cis = np.polar(np.ones_like(freqs), freqs)  # complex64
             cache['freqs_cis'] = freqs_cis
 
-        y = np.reshape(x, (B,L,N,2,D//2)).float()
+        y = np.reshape(x, (B,L,N,2,D//2))
         y = np.einsum('blncd->bnldc',y)
         y = np.view_as_complex(y.contiguous())
         y = np.view_as_real(y*freqs_cis[pos:pos+L]).type_as(x)
