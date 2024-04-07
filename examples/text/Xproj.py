@@ -3,11 +3,14 @@ import aka.numpy as np
 
 def XprojBlock(**kwargs):
     '''
-    FFN/MLP/Attention/.....
+    FFN/MLP/Hawk/SSM/Attention/.....
     Args:
         latent_dim:       (required)
         hidden_dim:       latent_dim (default)
         num_heads:        1 (default)
+    Example:
+        1, FFN/MLP: XprojBlock(num_heads = 1, gate='gh', latent_dim, hidden_dim)
+        2, Attention: 
     '''
     def __init__(self, **kwargs):
         args = nn.Object(**kwargs)
@@ -88,8 +91,13 @@ def XprojBlock(**kwargs):
 
         # mixers
         if self.mixers is not None:
-            for mixer in self.mixers:
-                x = mixer(x, k=k, state=state)
+            if state is not None:
+                mixer_states = state.get('mixer_state', None)
+                if mixer_states is None:
+                    mixer_states = [{} for _ in self.mixers]
+                    state['mixer_state'] = mixer_states
+            for i, mixer in enumerate(self.mixers):
+                x = mixer(x, k=k, state=None if state is None else mixer_states[i])
                 
         return (k, x, (hg, og, (b,l,d)))
 
