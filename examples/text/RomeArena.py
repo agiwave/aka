@@ -1,7 +1,7 @@
 
 import os
 os.environ["aka_provider_name"] = "aka.providers.torch"
-os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+# os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 import aka.nn as nn
 import aka.repo as repo
