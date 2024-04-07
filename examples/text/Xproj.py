@@ -19,7 +19,7 @@ def XprojBlock(**kwargs):
 
         self.hidden_dim = getattr(args, 'hidden_dim', args.latent_dim)
         self.xproj_heads = getattr(args, 'xproj_heads', 1)
-        self.k_dims = getattr(args, 'k_dims', [])
+        self.kv_dims = getattr(args, 'kv_dims', [self.hidden_dim])
         match getattr(args, 'gate', None):
             case 'gh':
                 (self.hg_dim, self.og_dim) = (self.hidden_dim, 0)
@@ -27,18 +27,20 @@ def XprojBlock(**kwargs):
                 (self.hg_dim, self.og_dim) = (0, args.latent_dim)
             case _:
                 (self.hg_dim, self.og_dim) = (0, 0)
-        self.act = getattr(np, getattr(args, 'activation', 'gelu'))
+
+        act = getattr(args, 'activation', None)
+        self.act = None if act is None else getattr(np, act)
         assert args.latent_dim % self.xproj_heads == 0
         assert self.hidden_dim % self.xproj_heads == 0
 
         # ik, vk, v, hg, og
         k_sum_dim = 0
-        for k_dim in self.k_dims:
+        for k_dim in self.kv_dims:
             k_sum_dim += k_dim
             assert k_dim % self.xproj_heads == 0
         self.in_proj = nn.Parameter(shape=(
             self.xproj_heads,
-            (k_sum_dim + self.hidden_dim + self.hg_dim + self.og_dim)//self.xproj_heads,
+            (k_sum_dim + self.hg_dim + self.og_dim)//self.xproj_heads,
             args.latent_dim//self.xproj_heads)
         )
 
@@ -83,7 +85,7 @@ def XprojBlock(**kwargs):
         # Inproj
         x = x.view(b, l, self.xproj_heads, -1)
         xprojs = np.einsum('b l h d, h v d->b l h v', x, self.in_proj)
-        split_dims = self.k_dims + [self.hidden_dim, self.hg_dim, self.og_dim]
+        split_dims = self.kv_dims + [self.hg_dim, self.og_dim]
         splits = xprojs.split([dim//self.xproj_heads for dim in split_dims], dim=-1)
         splits = [np.rearrange('b l h d->b l (h d)', item) for item in splits]
         (x, hg, og) = splits[-3], splits[-2], splits[-1]
@@ -105,7 +107,10 @@ def XprojBlock(**kwargs):
         (hg, og, shape) = g
         (b, l, _) = shape
         x = x if self.dropout is None else self.dropout(x)
-        x = self.act(x) if self.hg_dim == 0 else self.act(hg) * x
+        if self.hg_dim == 0:
+            x = x if self.act is None else self.act(x)
+        else:
+            x = (hg if self.act is None else self.act(hg)) * x
         x = x.view(b, l, -1, self.xproj_heads)    # mix heads
         x = np.einsum('b l v h , h d v -> b l h d', x, self.out_proj)
         x = np.reshape(x, shape)

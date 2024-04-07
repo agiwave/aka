@@ -18,7 +18,7 @@ def HawkBlock(**kwargs):
         # rg, ig, v, g
         if getattr(args, 'xproj', True):
             from Xproj import XprojBlock
-            self.xproj = XprojBlock(**dict(kwargs, k_dims=[self.num_heads, self.num_heads]))
+            self.xproj = XprojBlock(**dict(kwargs, kv_dims=[self.num_heads, self.num_heads, self.hidden_dim]))
         else:
             self.xproj = None
 

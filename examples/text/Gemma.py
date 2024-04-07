@@ -24,6 +24,7 @@ def GemmaArgs(name, tokenizer='data/Gemma/tokenizer.model'):
         name = "Xproj",
         hidden_dim = 0,
         gate = 'gh',
+        activation = 'gelu'
     )
     attn_args = dict(
         name = 'Attention',
@@ -104,8 +105,10 @@ def Gemma(name, ckpt=None, tokenizer='data/Gemma/tokenizer.model'):
             m.post_norm.weight.copy_(state['model.norm.weight']+1)
             for i in range(len(m.layers)//2):
                 m.layers[i*2].norm.weight.copy_(state[f'model.layers.{i}.input_layernorm.weight']+1)
-                m.layers[i*2].layer.in_proj.weight.copy_(state[f'model.layers.{i}.self_attn.qkv_proj.weight'])
-                m.layers[i*2].layer.out_proj.weight.copy_(state[f'model.layers.{i}.self_attn.o_proj.weight'])
+                m.layers[i*2].layer.xproj.copy_xproj_weights(
+                    [state[f'model.layers.{i}.self_attn.qkv_proj.weight']],
+                    state[f'model.layers.{i}.self_attn.o_proj.weight']
+                )
                 m.layers[i*2+1].norm.weight.copy_(state[f'model.layers.{i}.post_attention_layernorm.weight']+1)
                 m.layers[i*2+1].layer.copy_xproj_weights(
                     [state[f'model.layers.{i}.mlp.up_proj.weight'], 
