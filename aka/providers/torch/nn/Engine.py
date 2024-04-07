@@ -26,6 +26,7 @@ def train(
         persist_per_batchs = None,
         shuffle = True,
         batch_size = 8,
+        show_frequency = 0.2,
         epochs = 1,
         show_chart = False, **kwargs):
 
@@ -79,7 +80,7 @@ def train(
             
             # -- Print batch result if passed time over 0.2s --
             curr_time = time.time()
-            if(curr_time-last_print_time > 0.2):
+            if(curr_time-last_print_time > show_frequency):
                 batch_time = ctx.batch_time
                 progress = (ctx.i_batchs+1)*100.0/ctx.n_batchs
                 print('\033[A\033[2K'+'|'.join(format(str(item), f'^{12}') for item in [

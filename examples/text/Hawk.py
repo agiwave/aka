@@ -76,21 +76,18 @@ def HawkBlock(**kwargs):
             return x
     return __init__(nn.Module(forward = forward),**kwargs)
 
-def HawkArgs(name):
+if __name__ == "__main__":
     args = dict(
         vocab_dim = 32,
         latent_dim = 384,
-        layers = [dict(
-            name = 'Hawk',
-            num_heads = 8,
-            conv_kernel_size = 4
-        )]*16,
+        xproj_heads = 4,
         resident_gate = True,
+        gate='go',
+        activation='silu',
         dropout = 0.1,
         bias = False, # bias in Linear?
     )
-    hawk_args = dict(
-        name = 'Hawk',
+    att_args = dict(
         num_heads = 8,
         mixers = [
             dict(
@@ -98,94 +95,51 @@ def HawkArgs(name):
             ),
         ]
     )
-    match(name):
-        case 'Hawk':
-            return dict(
-                args,
-                layers = [
-                    hawk_args,
-                    dict(
-                        name = "Xproj",
-                        hidden_dim = args['latent_dim']*3,
-                        gate = 'go'
-                    )
-                ]*8,
-            )
-        case 'HawkOnly':
-            return dict(
-                args,
-                layers = [hawk_args]*16,
-            )
-        case 'Griffin':
-            return dict(
-                args,
-                layers = [
-                    dict(
-                        name = 'Attention',
-                        num_heads = 8,
-                        num_kv_groups = 8,
-                        rotary_embedding = True,
-                    ),
-                    dict(
-                        name = 'Xproj',
-                        hidden_dim = args['latent_dim']*3,
-                        gate = 'go'
-                    ),
-                    hawk_args,
-                    dict(
-                        name = 'Xproj',
-                        hidden_dim = args['latent_dim']*3,
-                        gate = 'go'
-                    ),
-                ]*4,
-            )
-        case 'Mamba':
-            return dict(
-                args,
-                layers = [dict(
-                    name = 'Mamba',
-                    num_heads = 8,
-                )]*16,
-            )
-        case 'RWKV':
-            return dict(
-                args,
-                layers = [
-                    dict(
-                        name = 'RWKVTMixer',
-                        num_heads = 8,
-                    ),
-                    dict(
-                        name = 'RWKVCMixer',
-                        k_size = args['latent_dim']*3,
-                        kv_gate = True
-                    )
-                ]*8,
-            )
-        case '300m':
-            return dict(
-                args,
-                latent_dim = 1024,
-                layers = [dict(
-                    name = 'Hawk',
-                    num_heads = 16
-                )]*96,
-            )
-        case _:
-            assert False
-
-if __name__ == "__main__":
-    from RomeArena import TrainRoles, RunRoles, PlotRoles
+    mlp_args = dict(
+        name = "Xproj",
+        hidden_dim = args['latent_dim']*3,
+    )
     roles = [
-        'Hawk-Hawk',
-        # 'Hawk-Mamba',
-        'Hawk-Griffin',
-        'Hawk-HawkOnly',
-        'Hawk-RWKV',
-        # 'Hawk-Hawk100m',
-        # 'Hawk-SSMOnly',
-        # 'Hawk-300m'
+        dict( args, name = 'Hawk',
+            layers = [
+                dict(att_args, name='Hawk'), mlp_args] * 12
+        ),
+        dict( args, name = 'HawkOnly',
+            layers = [
+                dict(att_args, name='Hawk')] * 24
+        ),
+        dict( args, name = 'Griffin',
+            layers = [
+                dict(att_args, name='Hawk'), mlp_args,
+                dict(att_args, name='Attention'), mlp_args,] * 6
+        ),
+        dict( args, name = 'Mamba',
+            layers = [
+                dict(att_args, name='Mamba')] * 24
+        ),
+        dict( args, name = 'RetNet',
+            layers = [
+                dict(att_args, name='Retention'), mlp_args] * 12
+        ),
+        dict( args, name = 'RWKV',
+            layers = [
+                dict(
+                    name = 'RWKVTMixer',
+                    num_heads = 8,
+                ),
+                dict(
+                    name = 'RWKVCMixer',
+                    hidden_dim = args['latent_dim']*3,
+                )
+            ]*12
+        ),
+        dict( args, name = 'Attn',
+            layers = [
+                dict(att_args, name='Attention'), mlp_args] * 12
+        )
     ]
+
+    from RomeArena import TrainRoles, RunRoles, PlotRoles
     # PlotRoles(roles, np.load('examples/text/hawk-losses.ckt'))
-    TrainRoles(roles, lr = 6e-3, epochs=1, show=True)
+    TrainRoles(roles, lr = 6e-3, epochs=1, show=True, show_frequency=2)
     # RunRoles(roles, 'My lord Sebastian')
