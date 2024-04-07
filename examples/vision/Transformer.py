@@ -2,7 +2,7 @@
 # os.environ["aka_provider_name"] = "aka.providers.torch"
 import aka.nn as nn
 import aka.numpy as np
-from .SelfAttention import SelfAttention
+from Attention import SelfAttention
 
 def TransFormer(num_classes=100):
     def FeedForword(n_inputs, n_hiddens):
