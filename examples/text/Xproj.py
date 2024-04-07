@@ -28,8 +28,9 @@ def XprojBlock(**kwargs):
         # ik, vk, v, vg, og
         self.in_proj = nn.Parameter(shape=(
             self.num_heads,
-            args.latent_dim//self.num_heads, 
-            (2 * self.k_dim + self.hidden_dim + self.vg_dim + self.og_dim)//self.num_heads))
+            (2 * self.k_dim + self.hidden_dim + self.vg_dim + self.og_dim)//self.num_heads,
+            args.latent_dim//self.num_heads)
+        )
 
         # mixers
         def createMixer(name, **kwargs):
@@ -61,7 +62,7 @@ def XprojBlock(**kwargs):
 
     def copy_xproj_weights(self, in_projs, out_proj):
         in_proj = np.cat(in_projs, dim=0)
-        in_proj = np.rearrange('(h d) k->h k d', in_proj, h=self.num_heads)
+        in_proj = np.rearrange('(h d) k->h d k', in_proj, h=self.num_heads)
 
         out_proj = np.rearrange('(h d) k->h d k', out_proj, h=self.num_heads)
         self.in_proj.copy_(in_proj)
@@ -71,7 +72,7 @@ def XprojBlock(**kwargs):
         (b, l, d) = x.shape
         # Inproj
         x = x.view(b, l, self.num_heads, -1)
-        xprojs = np.einsum('b l h d, h d v->b l h v', x, self.in_proj)
+        xprojs = np.einsum('b l h d, h v d->b l h v', x, self.in_proj)
         split_dims = [self.k_dim, self.k_dim, self.hidden_dim, self.vg_dim, self.og_dim]
         (ik, vk, x, vg, og) = xprojs.split([dim//self.num_heads for dim in split_dims], dim=-1)
         return (ik, vk, x, (vg, og, (b,l,d)))
