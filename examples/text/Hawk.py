@@ -15,10 +15,10 @@ def HawkBlock(**kwargs):
         self.hidden_dim = getattr(args, 'hidden_dim', args.latent_dim)
         self.num_heads = getattr(args, 'num_heads', 8)
         assert self.hidden_dim % self.num_heads == 0
-        # rg, ig, v, vg, og
+        # rg, ig, v, g
         if getattr(args, 'xproj', True):
             from Xproj import XprojBlock
-            self.xproj = XprojBlock(**dict(kwargs, num_heads=1, k_dim=self.num_heads))
+            self.xproj = XprojBlock(**dict(kwargs, num_heads=1, k_dims=[self.num_heads, self.num_heads]))
         else:
             self.xproj = None
 
@@ -29,7 +29,7 @@ def HawkBlock(**kwargs):
     def forward(self, x, k=None, state=None, **kwargs):
         (b, l, d) = x.shape
         if self.xproj is not None:
-            (rg, ig, x, go) = self.xproj.proj_in(x)
+            ((rg, ig), x, go) = self.xproj.proj_in(x)
         else:
             (rg, ig) = k
 

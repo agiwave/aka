@@ -17,55 +17,26 @@ def SSMBlock(**kwargs):
         self.hidden_dim = getattr(args, 'hidden_dim', args.latent_dim)
         self.num_heads = getattr(args, 'num_heads', 8)
         self.k_dim = getattr(args, 'k_dim', self.num_heads*8)
-        self.gh_dim = self.hidden_dim if getattr(args, 'v_gate', False) else 0
-        self.go_dim = args.latent_dim if getattr(args, 'o_gate', True) else 0
+        # rg, ig, v, g
+        if getattr(args, 'xproj', True):
+            from Xproj import XprojBlock
+            self.xproj = XprojBlock(**dict(kwargs, num_heads=1, k_dims=[self.k_dim, self.num_heads, self.num_heads, self.num_heads]))
+        else:
+            self.xproj = None
         assert self.hidden_dim % self.num_heads == 0
         assert self.k_dim % self.num_heads == 0
 
         # A, B, C, gv, v, gh, go
         self.A_mode = getattr(args, 'A_mode', 0)
-        self.in_proj = nn.Linear(args.latent_dim, self.k_dim + 3 * self.num_heads + self.hidden_dim + self.gh_dim + self.go_dim, bias=args.bias)
-        self.conv_kernel_size = getattr(args, 'conv_kernel_size', 4)
-        self.prev_conv = getattr(args, 'prev_conv', True)
-        self.post_conv = getattr(args, 'post_conv', False)
-        self.conv1d = None if not (self.prev_conv or self.post_conv) else nn.Conv1d(
-            in_channels=self.hidden_dim,
-            out_channels=self.hidden_dim,
-            bias=args.bias,
-            kernel_size=self.conv_kernel_size,
-            groups=self.hidden_dim,
-            padding=0
-        )
         self.delta = nn.Parameter(np.arange(1, 1 + self.num_heads, dtype=np.float))
-        self.out_proj = nn.Linear(self.hidden_dim, args.latent_dim, bias=args.bias)
-        self.C = nn.Parameter(shape=(self.k_dim // self.num_heads, self.num_heads, self.k_dim // self.num_heads))
-        self.norm_v = nn.RMSNorm(self.hidden_dim)
         return self
 
-    def conv(x, k, kernel_size, state, key):
+    def forward(self, x, k=None, state=None,  **kwargs):
         (b, l, d) = x.shape
-        x = np.rearrange('b l d->b d l', x)
-        if state is not None:
-            conv_state = state.get(key,None)
-            if conv_state is not None:
-                x = np.cat((state[key], x), dim=2)
-            state[key] = x[:, :, (1 - kernel_size):].detach()
-        if x.size(2) < l + kernel_size - 1:
-            x = np.pad(x, (l + kernel_size - 1 - x.size(2), 0), mode='replicate')
-        x = k(x)
-        x = np.silu(x)
-        return np.rearrange('b d l->b l d', x)
-
-    def forward(self, x, state=None, **kwargs):
-        (b, l, d) = x.shape
-        (A, B, C, v, gv, gh, go) = self.in_proj(x).split([
-            self.num_heads, self.num_heads,
-            self.k_dim,
-            self.hidden_dim,
-            self.num_heads, self.gh_dim, self.go_dim], dim=-1)
-        
-        # -- Prev Conv -- 
-        v = v if not self.prev_conv else conv(v, self.conv1d, self.conv_kernel_size, state, 'prev_conv_state')
+        if self.xproj is not None:
+            ((C, A, B, gv), v, go) = self.xproj.proj_in(x)
+        else:
+            (C, A, B, gv) = k
 
         # -- Prepare State --
         ssm_state = None if state is None else state.get('ssm_state',None)
@@ -111,12 +82,11 @@ def SSMBlock(**kwargs):
         if state is not None:
             state['ssm_state'] = (t+l, ssm_state.detach())
 
-        # -- Post Conv -- 
-        x = x if not self.post_conv else conv(x, self.conv1d, self.conv_kernel_size, state, 'post_conv_state')
-
         # Gate and Output
-        x = x if self.gh_dim <= 0 else x * np.gelu(gh)
-        return self.out_proj(x) if self.go_dim <=0 else self.out_proj(x) * np.gelu(go)
+        if self.xproj is not None:
+            return self.xproj.proj_out(x, go)
+        else:
+            return x
 
     return __init__(nn.Module(forward = forward),**kwargs)
 
@@ -133,6 +103,19 @@ def SSMArgs(name):
         dropout = 0.1,
         bias = False, # bias in Linear?
     )
+    ssm_args = dict(
+        name = 'SSM',
+        num_heads = 8,
+        mixers = [
+            dict(
+                name = 'Conv1d'
+            ),
+        ]
+    )
+    mlp_args = dict(
+        name = "Xproj",
+        hidden_dim = args['latent_dim']*3
+    )
     match(name):
         case 'Gemma':
             return dict(
@@ -144,114 +127,32 @@ def SSMArgs(name):
                         num_heads = 8,
                         rotary_embedding = True
                     ),
-                    dict(
-                        name = "MLP",
-                        hidden_dim = args['latent_dim']*3
-                    )
+                    mlp_args
                 ]*8,
             )
         case 'Hawk':
             return dict(
                 args,
                 layers = [
-                    dict(
-                        name = 'Hawk',
-                        num_heads = 8,
-                    ),
-                    dict(
-                        name = "MLP",
-                        hidden_dim = args['latent_dim']*3
-                    )
+                    ssm_args,
+                    mlp_args
                 ]*8,
-            )
-        case 'HawkOnly':
-            return dict(
-                args,
-                layers = [dict(
-                    name = 'SSM',
-                    num_heads = 8,
-                    k_dim = 64,
-                    hidden_dim = args['latent_dim']
-                )]*16,
             )
         case 'SSM':
             return dict(
                 args,
                 layers = [
-                    dict(
-                        name = 'SSM',
-                        num_heads = 8,
-                        num_states = 8,
-                    ),
-                    dict(
-                        name = "MLP",
-                        hidden_dim = args['latent_dim']*3
-                    )
+                    ssm_args,
+                    mlp_args
                 ]*8,
             )
         case 'SSMOnly':
             return dict(
                 args,
                 layers = [dict(
-                    name = 'SSM',
-                    num_heads = 8,
-                    k_dim = 64,
-                    hidden_dim = args['latent_dim']
+                    ssm_args,
+                    k_dim = 64
                 )]*16,
-            )
-        case 'Griffin':
-            return dict(
-                args,
-                layers = [
-                    dict(
-                        name = 'Attention',
-                        num_heads = 8,
-                        num_kv_groups = 8,
-                        rotary_embedding = True,
-                    ),
-                    dict(
-                        name = 'Hawk',
-                        num_heads = 8,
-                    ),
-                ]*8,
-            )
-        case 'Mamba':
-            return dict(
-                args,
-                layers = [dict(
-                    name = 'Mamba',
-                    num_heads = 8,
-                    num_states = 8
-                )]*16,
-            )
-        case 'RWKV':
-            return dict(
-                args,
-                layers = [
-                    dict(
-                        name = 'RWKVTMixer',
-                        num_heads = 8,
-                    ),
-                    dict(
-                        name = 'RWKVCMixer',
-                        hidden_dim = args['latent_dim']*3
-                    )
-                ]*8,
-            )
-        case 'RetNet':
-            return dict(
-                args,
-                layers = [
-                    dict(
-                        name = 'Retention',
-                        num_heads = 8,
-                        rotary_embedding = True
-                    ),
-                    dict(
-                        name = "MLP",
-                        hidden_dim = args['latent_dim']*3
-                    )
-                ]*8,
             )
         case _:
             assert False
@@ -259,7 +160,7 @@ def SSMArgs(name):
 if __name__ == "__main__":
     from RomeArena import TrainRoles, RunRoles
     roles = [
-        # 'SSM-SSM',
+        'SSM-SSM',
         # 'SSM-SSMOnly',
         # 'SSM-Gemma',
         # 'SSM-Hawk',
@@ -267,7 +168,7 @@ if __name__ == "__main__":
         # 'SSM-Griffin',
         # 'SSM-Mamba',
         # 'SSM-RWKV',
-        'SSM-RetNet'
+        # 'SSM-RetNet'
     ]
     TrainRoles(roles, lr = 6e-3, epochs=4)
     # RunRoles(roles, 'My lord Sebastian')

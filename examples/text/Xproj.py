@@ -16,7 +16,7 @@ def XprojBlock(**kwargs):
 
         self.hidden_dim = getattr(args, 'hidden_dim', args.latent_dim)
         self.num_heads = getattr(args, 'num_heads', 1)
-        self.k_dim = getattr(args, 'k_dim', 0)
+        self.k_dims = getattr(args, 'k_dims', [])
         match getattr(args, 'gate', None):
             case 'gh':
                 (self.hg_dim, self.og_dim) = (self.hidden_dim, 0)
@@ -27,12 +27,15 @@ def XprojBlock(**kwargs):
         self.act = getattr(np, getattr(args, 'activation', 'gelu'))
         assert args.latent_dim % self.num_heads == 0
         assert self.hidden_dim % self.num_heads == 0
-        assert self.k_dim % self.num_heads == 0
 
         # ik, vk, v, hg, og
+        k_sum_dim = 0
+        for k_dim in self.k_dims:
+            k_sum_dim += k_dim
+            assert k_dim % self.num_heads == 0
         self.in_proj = nn.Parameter(shape=(
             self.num_heads,
-            (2 * self.k_dim + self.hidden_dim + self.hg_dim + self.og_dim)//self.num_heads,
+            (k_sum_dim + self.hidden_dim + self.hg_dim + self.og_dim)//self.num_heads,
             args.latent_dim//self.num_heads)
         )
 
@@ -77,16 +80,18 @@ def XprojBlock(**kwargs):
         # Inproj
         x = x.view(b, l, self.num_heads, -1)
         xprojs = np.einsum('b l h d, h v d->b l h v', x, self.in_proj)
-        split_dims = [self.k_dim, self.k_dim, self.hidden_dim, self.hg_dim, self.og_dim]
-        (ik, vk, x, hg, og) = xprojs.split([dim//self.num_heads for dim in split_dims], dim=-1)
-        (ik, vk, x, hg, og) = [np.rearrange('b l h d->b l (h d)', item) for item in [ik, vk, x, hg, og]]
+        split_dims = self.k_dims + [self.hidden_dim, self.hg_dim, self.og_dim]
+        splits = xprojs.split([dim//self.num_heads for dim in split_dims], dim=-1)
+        splits = [np.rearrange('b l h d->b l (h d)', item) for item in splits]
+        (x, hg, og) = splits[-3], splits[-2], splits[-1]
+        k = splits[:-3]
 
         # mixers
         if self.mixers is not None:
             for mixer in self.mixers:
-                x = mixer(x, k=(ik, vk), state=state)
+                x = mixer(x, k=k, state=state)
                 
-        return (ik, vk, x, (hg, og, (b,l,d)))
+        return (k, x, (hg, og, (b,l,d)))
 
     def proj_out(self, x, g, **kwargs):
         (hg, og, shape) = g
@@ -95,11 +100,11 @@ def XprojBlock(**kwargs):
         x = self.act(x) if self.hg_dim == 0 else self.act(hg) * x
         x = x.view(b, l, -1, self.num_heads)    # mix heads
         x = np.einsum('b l v h , h d v -> b l h d', x, self.out_proj)
-        x = x if self.og_dim == 0 else self.act(og) * x
-        return np.reshape(x, shape)
+        x = np.reshape(x, shape)
+        return x if self.og_dim == 0 else self.act(og) * x
 
     def forward(self, x, state=None, **kwargs):
-        (_, _, x, g) = self.proj_in(x)
+        (_, x, g) = self.proj_in(x)
         return self.proj_out(x, g)
     return __init__(nn.Module(forward = forward, proj_in=proj_in, proj_out=proj_out, copy_xproj_weights=copy_xproj_weights),**kwargs)
 
