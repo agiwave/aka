@@ -150,9 +150,27 @@ def DragonflyArgs(name):
     match(name):
         case 'tiny':
             return args
+        case 'vsHawk':
+            return dict(
+                args,
+                latent_dim = 768,
+                layers = [dict(
+                    name = 'Dragonfly',
+                    num_heads = 8,
+                )]*16
+            )
+        case 'HawkOnly':
+            return dict(
+                args,
+                layers = [dict(
+                    name = 'Hawk',
+                    num_heads = 8
+                )]*16,
+            )
         case '8m':
             return dict(
                 args,
+                vocab_dim = 64,
                 latent_dim = 768,
                 layers = [dict(
                     name = 'Dragonfly',
@@ -194,11 +212,13 @@ def DragonflyArgs(name):
 if __name__ == "__main__":
     from RomeArena import TrainRoles, RunRoles
     roles = [
-        'Dragonfly-tiny',
+        # 'Dragonfly-tiny',
+        'Dragonfly-vsHawk',
+        'Dragonfly-HawkOnly',
         # 'Dragonfly-8m',
         # 'Dragonfly-20m',
         # 'Dragonfly-70m',
         # 'Dragonfly-200m',
     ]
-    TrainRoles(roles, lr=6e-3, epochs=1)
-    # RunRoles(roles, '在黄沙莽莽的回疆大漠')
+    TrainRoles(roles, lr=6e-3, epochs=2)
+    # RunRoles(roles, 'My lord Sebastian')

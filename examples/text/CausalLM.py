@@ -8,7 +8,7 @@ def MetaLayer(**kwargs):
     '''
     def __init__(self, name, **kwargs):
         import importlib
-        module = importlib.import_module(f"examples.text.{name}")
+        module = importlib.import_module(name)
         short_name = name.split('./\\')[-1]
         m = getattr(module, short_name+"Block", None)
         assert m is not None, f"Unknown layer:{name}"
@@ -44,7 +44,7 @@ def CausalLM(**kwargs):
         self.in_proj = None if self.vocab_dim == self.latent_dim else nn.Linear(self.vocab_dim, self.latent_dim, bias=args.bias)
         self.out_proj = None if self.vocab_dim == self.latent_dim else nn.Linear(self.latent_dim, self.vocab_dim, bias=args.bias)
         self.pad_x = getattr(args, 'pad_x', False)
-        self.embedding_scale = (None if not getattr(args,'embedding_scale',False) else math.sqrt(vocab_dim))
+        self.embedding_scale = (None if not getattr(args,'embedding_scale',False) else math.sqrt(self.vocab_dim))
         self.embedding = nn.Embedding(num_embeddings=args.vocab_size, embedding_dim=self.vocab_dim)
 
         make_layer = MetaLayer if not hasattr(args, 'MetaLayer') else args.MetaLayer
@@ -157,11 +157,8 @@ def CausalLM(**kwargs):
 
 def CausalLMArgs(name):
     mlp_args = dict(
-        name = 'MLP',
-        k_size = 384*4,
-        kv_gate = True,
-        k_dim = 384,
-        hidden_dim = 384
+        name = 'Xproj',
+        hidden_dim = 384*4,
     )
     attn_args = dict(
         name = 'Attention',

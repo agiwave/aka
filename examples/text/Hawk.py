@@ -11,27 +11,26 @@ def HawkBlock(**kwargs):
     '''
     def __init__(self, **kwargs):
         args = nn.Object(**kwargs)
+
+        # from MetaMixer import MetaMixerBlock
+        # self.xproj = None if getattr(args, 'xproj', True) else self.xproj = MetaMixerBlock(**kwargs)
+
+        self.xproj = getattr(args, 'xproj', True)
         self.hidden_dim = getattr(args, 'hidden_dim', args.latent_dim)
         self.v_gate_dim = self.hidden_dim if getattr(args, 'v_gate', False) else 0
         self.o_gate_dim = args.latent_dim if getattr(args, 'o_gate', True) else 0
         self.num_heads = getattr(args, 'num_heads', 8)
         assert self.hidden_dim % self.num_heads == 0
         # rg, ig, v, vg, og
-        self.in_proj = nn.Linear(args.latent_dim, self.num_heads*2 + self.hidden_dim + self.v_gate_dim + self.o_gate_dim, bias=args.bias)
-        self.conv_kernel_size = getattr(args, 'conv_kernel_size', 4)
-        self.prev_conv = getattr(args, 'prev_conv', True)
-        self.post_conv = getattr(args, 'post_conv', False)
-        self.conv1d = None if not (self.prev_conv or self.post_conv) else nn.Conv1d(
-            in_channels=self.hidden_dim,
-            out_channels=self.hidden_dim,
-            bias=args.bias,
-            kernel_size=self.conv_kernel_size,
-            groups=self.hidden_dim,
-            padding=0
-        )
+        if self.xproj:
+            self.in_proj = nn.Linear(args.latent_dim, self.num_heads*2 + self.hidden_dim + self.v_gate_dim + self.o_gate_dim, bias=args.bias)
+            from Conv1d import Conv1dBlock
+            self.prev_conv = None if not getattr(args, 'prev_conv', True) else Conv1dBlock(**kwargs)
+            self.post_conv = None if not getattr(args, 'prev_conv', True) else Conv1dBlock(**kwargs)
+            self.out_proj = nn.Linear(self.hidden_dim, args.latent_dim, bias=args.bias)
+
         self.c = nn.Parameter(np.array(-8.), requires_grad=False)
         self.delta = nn.Parameter(np.array(0.5))
-        self.out_proj = nn.Linear(self.hidden_dim, args.latent_dim, bias=args.bias)
         return self
 
     def conv(x, k, kernel_size, state, key):
@@ -48,19 +47,24 @@ def HawkBlock(**kwargs):
         x = np.silu(x)
         return np.rearrange('b d l->b l d', x)
 
-    def forward(self, x, state=None, **kwargs):
+    def forward(self, x, ik=None, vk=None, state=None, **kwargs):
         (b, l, d) = x.shape
-        (rg, ig, x, vg, og) = self.in_proj(x).split([self.num_heads, self.num_heads, self.hidden_dim, self.v_gate_dim, self.o_gate_dim], dim=-1)
-        
-        # -- Prev Conv -- 
-        x = x if not self.prev_conv else conv(x, self.conv1d, self.conv_kernel_size, state, 'prev_conv_state')
+        if self.xproj:
+            (rg, ig, x, vg, og) = self.in_proj(x).split([self.num_heads, self.num_heads, self.hidden_dim, self.v_gate_dim, self.o_gate_dim], dim=-1)
+            rg = rg.unsqueeze(-1)
+            ig = ig.unsqueeze(-1)
+
+            # -- Prev Conv -- 
+            x = x if self.prev_conv is not None else self.prev_conv(x, state)
+        else:
+            (rg, ig) = (vk, ik)
 
         # -- RG_LRU or GRU --
         rg = np.sigmoid(rg)
-        rg = ((self.c * np.softplus(self.delta)) * rg).unsqueeze(-1)  # [B,L,H]
+        rg = ((self.c * np.softplus(self.delta)) * rg)  # [B,L,H]
 
         x = np.rearrange('b l (h d)->b l h d', x, h=self.num_heads) # [B,L,H,D]
-        x = (1-np.exp(rg)) * np.sigmoid(ig).unsqueeze(-1) * x # The orginal paper: np.sqrt(1-rg**2)*np.sigmoid(ig).unsqueeze(-1) * x
+        x = (1-np.exp(rg)) * np.sigmoid(ig) * x # The orginal paper: np.sqrt(1-rg**2)*np.sigmoid(ig).unsqueeze(-1) * x
         gru_state = None if state is None else state.get('gru_state',None)
         gru_state = gru_state if gru_state is not None else np.zeros(b, 1, self.num_heads, self.hidden_dim//self.num_heads, dtype=x.dtype, device=x.device)
 
@@ -89,12 +93,15 @@ def HawkBlock(**kwargs):
             state['gru_state'] = x[:,-1:].detach()
         x = np.rearrange('b l h d->b l (h d)',x)
 
-        # -- Post Conv -- 
-        x = x if not self.post_conv else conv(x, self.conv1d, self.conv_kernel_size, state, 'post_conv_state')
-
         # Gate and Output
-        x = x if self.v_gate_dim <= 0 else x * np.gelu(vg)
-        return self.out_proj(x) if self.o_gate_dim <=0 else self.out_proj(x) * np.gelu(og)
+        if self.xproj:
+            # -- Post Conv -- 
+            x = x if self.post_conv is None else self.post_conv(x, state)
+
+            x = x if self.v_gate_dim <= 0 else x * np.gelu(vg)
+            return self.out_proj(x) if self.o_gate_dim <=0 else self.out_proj(x) * np.gelu(og)
+        else:
+            return x
     return __init__(nn.Module(forward = forward),**kwargs)
 
 def HawkArgs(name):
@@ -121,7 +128,7 @@ def HawkArgs(name):
                     ),
                     dict(
                         name = "MLP",
-                        k_size = args['latent_dim']*3,
+                        hidden_dim = args['latent_dim']*3,
                         kv_gate = True
                     )
                 ]*8,
@@ -145,8 +152,8 @@ def HawkArgs(name):
                         rotary_embedding = True,
                     ),
                     dict(
-                        name = 'MLP',
-                        k_size = args['latent_dim']*3,
+                        name = 'Xproj',
+                        hidden_dim = args['latent_dim']*3,
                         kv_gate = True
                     ),
                     dict(
@@ -154,8 +161,8 @@ def HawkArgs(name):
                         num_heads = 8,
                     ),
                     dict(
-                        name = 'MLP',
-                        k_size = args['latent_dim']*3,
+                        name = 'Xproj',
+                        hidden_dim = args['latent_dim']*3,
                         kv_gate = True
                     ),
                 ]*4,
@@ -208,5 +215,5 @@ if __name__ == "__main__":
         # 'Hawk-300m'
     ]
     # PlotRoles(roles, np.load('examples/text/hawk-losses.ckt'))
-    # TrainRoles(roles, lr = 6e-3, epochs=1, show=True)
-    RunRoles(roles, 'My lord Sebastian')
+    TrainRoles(roles, lr = 6e-3, epochs=1, show=True)
+    # RunRoles(roles, 'My lord Sebastian')

@@ -18,9 +18,8 @@ if __name__ == "__main__":
                 rotary_embedding = True,
             ), 
             dict(
-                name = 'MLP',
-                k_size = 768*4,
-                kv_gate = False,
+                name = 'Xproj',
+                hidden_dim = 768*4
             )
         ]*6
     )

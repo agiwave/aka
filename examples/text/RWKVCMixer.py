@@ -21,10 +21,10 @@ def RWKV_CMix_x060(**kwargs):
         self.time_maa_k = nn.Parameter(1.0 - np.pow(ddd, ratio_1_to_almost0))
         self.time_maa_r = nn.Parameter(1.0 - np.pow(ddd, ratio_1_to_almost0))
 
-        k_size = getattr(args, 'k_size', args.latent_dim)
-        self.key = nn.Linear(args.latent_dim, k_size, bias=args.bias)
+        hidden_dim = getattr(args, 'hidden_dim', args.latent_dim)
+        self.key = nn.Linear(args.latent_dim, hidden_dim, bias=args.bias)
         self.receptance = nn.Linear(args.latent_dim, args.latent_dim, bias=args.bias)
-        self.value = nn.Linear(k_size, args.latent_dim, bias=args.bias)
+        self.value = nn.Linear(hidden_dim, args.latent_dim, bias=args.bias)
         return self
 
     def forward(self, x, **kwargs):

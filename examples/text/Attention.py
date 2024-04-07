@@ -21,7 +21,7 @@ def AttentionBlock(**kwargs):
         args.attn_args.kv_groups = 1 ==> MQA: Multi-Query Attention
         args.attn_args.kv_groups = 2 ==> GQA: Group-Query Attention
     '''
-    def __init__(self,**kwargs):
+    def __init__(self, **kwargs):
         args = nn.Object(**kwargs)
         
         # -- Global Args --
@@ -29,6 +29,7 @@ def AttentionBlock(**kwargs):
         dropout = getattr(args, 'dropout', 0.2)
 
         # -- Attention Args
+        self.xproj = getattr(args, 'xproj', True)
         self.k_dim = getattr(args, 'k_dim', args.latent_dim)
         self.hidden_dim = getattr(args, 'hidden_dim', args.latent_dim)
         self.num_heads = getattr(args, 'num_heads', 1)
@@ -38,8 +39,8 @@ def AttentionBlock(**kwargs):
         assert self.k_dim % self.num_heads == 0
         assert self.num_heads % self.num_kv_groups == 0
         assert self.hidden_dim % self.num_heads == 0
-        self.in_proj = nn.Linear(args.latent_dim, self.k_dim + self.group_k_dim + self.group_v_dim, bias=bias)
-        self.out_proj = nn.Linear(self.hidden_dim, args.latent_dim, bias=bias)
+        self.in_proj = None if not self.xproj else nn.Linear(args.latent_dim, self.k_dim + self.group_k_dim + self.group_v_dim, bias=bias)
+        self.out_proj = None if not self.xproj else nn.Linear(self.hidden_dim, args.latent_dim, bias=bias)
         self.attn_dropout = nn.Dropout(dropout)
         self.resid_dropout = nn.Dropout(dropout)
         self.window_size = getattr(args, 'window_size', None)
@@ -79,15 +80,20 @@ def AttentionBlock(**kwargs):
             mask = np.triu(mask, diagonal=shift - window_size + 1)
         return np.log(mask)
 
-    def forward(self, x, *, cache={}, state=None, **kwargs):
+    def forward(self, x, *, ik=None, vk=None, cache={}, state=None, **kwargs):
         B, L, _ = x.size()
 
         # -- qkv --
         num_heads, num_kv_groups = self.num_heads, self.num_kv_groups
-        q, k, v  = self.in_proj(x).split([self.k_dim, self.group_k_dim, self.group_v_dim], dim=2)
-        q = q.view(B, L, num_heads, -1)
-        k = k.view(B, L, num_kv_groups, -1)
-        v = v.view(B, L, num_kv_groups, -1)
+        if ik is None:
+            q, k, v  = self.in_proj(x).split([self.k_dim, self.group_k_dim, self.group_v_dim], dim=2)
+            q = q.view(B, L, num_heads, -1)
+            k = k.view(B, L, num_kv_groups, -1)
+            v = v.view(B, L, num_kv_groups, -1)
+        else:
+            q = ik.view(B, L, num_heads, -1)
+            k = vk.view(B, L, num_kv_groups, -1)
+            v = x.view(B, L, num_kv_groups, -1)
 
         # -- append kv cache --
         if state is not None:
@@ -123,7 +129,7 @@ def AttentionBlock(**kwargs):
             att = self.attn_dropout(att)
             y = np.einsum('bnlm,bmnd->blnd', att, v)
         y = y.reshape(B, L, self.hidden_dim)
-        return self.resid_dropout(self.out_proj(y))
+        return y if ik is not None else self.resid_dropout(self.out_proj(y))
     return __init__(nn.Module(forward=forward), **kwargs)
 
 # --- Example ---

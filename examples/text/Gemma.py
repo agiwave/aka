@@ -21,9 +21,10 @@ def GemmaArgs(name, tokenizer='data/Gemma/tokenizer.model'):
             return self.tokenizer.decode(s)
 
     mlp_args = dict(
-        name = "MLP",
-        k_size = 0,
-        kv_gate = True,
+        name = "Xproj",
+        hidden_dim = 0,
+        v_gate = True,
+        o_gate = False
     )
     attn_args = dict(
         name = 'Attention',
@@ -46,14 +47,14 @@ def GemmaArgs(name, tokenizer='data/Gemma/tokenizer.model'):
             args['latent_dim'] = 2048
             attn_args['num_heads'] = 8
             attn_args['num_kv_groups'] = 1
-            mlp_args['k_size'] = 16384
+            mlp_args['hidden_dim'] = 16384
             args['layers'] = [attn_args, mlp_args]*18
         case '7b':
             n_layers = 28
             args['latent_dim'] = 3072
             attn_args['num_heads'] = 16
             attn_args['num_kv_groups'] = 16
-            mlp_args['k_size'] = 24576
+            mlp_args['hidden_dim'] = 24576
             args['layers'] = [attn_args, mlp_args]*28
         case '20m':
             n_layers = 10
@@ -61,7 +62,7 @@ def GemmaArgs(name, tokenizer='data/Gemma/tokenizer.model'):
             attn_args['num_heads'] = 6
             attn_args['num_kv_groups'] = 6
             attn_args['window_size'] = 256
-            mlp_args['k_size'] = 1024
+            mlp_args['hidden_dim'] = 1024
             args['layers'] = [attn_args, mlp_args]*10
         case '70m':
             n_layers = 20
@@ -69,7 +70,7 @@ def GemmaArgs(name, tokenizer='data/Gemma/tokenizer.model'):
             attn_args['num_heads'] = 8
             attn_args['num_kv_groups'] = 8
             attn_args['window_size'] = 256
-            mlp_args['k_size'] = 512*3
+            mlp_args['hidden_dim'] = 512*3
             args['layers'] = [attn_args, mlp_args]*20
         case _:
             assert False, f"Unknown Gemma name{name}"
@@ -107,9 +108,11 @@ def Gemma(name, ckpt=None, tokenizer='data/Gemma/tokenizer.model'):
                 m.layers[i*2].layer.in_proj.weight.copy_(state[f'model.layers.{i}.self_attn.qkv_proj.weight'])
                 m.layers[i*2].layer.out_proj.weight.copy_(state[f'model.layers.{i}.self_attn.o_proj.weight'])
                 m.layers[i*2+1].norm.weight.copy_(state[f'model.layers.{i}.post_attention_layernorm.weight']+1)
-                m.layers[i*2+1].layer.gate_proj.data.copy_(state[f'model.layers.{i}.mlp.gate_proj.weight'])
-                m.layers[i*2+1].layer.up_proj.data.copy_(state[f'model.layers.{i}.mlp.up_proj.weight'])
-                m.layers[i*2+1].layer.down_proj.data.copy_(state[f'model.layers.{i}.mlp.down_proj.weight'])
+                m.layers[i*2+1].layer.copy_xproj_weights(
+                    [state[f'model.layers.{i}.mlp.up_proj.weight'], 
+                    state[f'model.layers.{i}.mlp.gate_proj.weight']],
+                    state[f'model.layers.{i}.mlp.down_proj.weight']
+                )
     return m
 
 if __name__ == "__main__":

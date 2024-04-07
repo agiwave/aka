@@ -21,9 +21,10 @@ def LLaMA(name):
                 num_kv_groups = 1
             ), 
             dict(
-                name = 'MLP',
-                k_size = 4096*4,   # ???
-                kv_gate = True,
+                name = 'Xproj',
+                hidden_dim = 4096*4,   # ???
+                v_gate = True,
+                o_gate = False
             )
         ]*32,
         dropout = 0.2,

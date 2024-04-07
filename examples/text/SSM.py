@@ -146,8 +146,7 @@ def SSMArgs(name):
                     ),
                     dict(
                         name = "MLP",
-                        k_size = args['latent_dim']*3,
-                        kv_gate = True
+                        hidden_dim = args['latent_dim']*3
                     )
                 ]*8,
             )
@@ -161,8 +160,7 @@ def SSMArgs(name):
                     ),
                     dict(
                         name = "MLP",
-                        k_size = args['latent_dim']*3,
-                        kv_gate = True
+                        hidden_dim = args['latent_dim']*3
                     )
                 ]*8,
             )
@@ -187,8 +185,7 @@ def SSMArgs(name):
                     ),
                     dict(
                         name = "MLP",
-                        k_size = args['latent_dim']*3,
-                        kv_gate = True
+                        hidden_dim = args['latent_dim']*3
                     )
                 ]*8,
             )
@@ -237,8 +234,7 @@ def SSMArgs(name):
                     ),
                     dict(
                         name = 'RWKVCMixer',
-                        k_size = args['latent_dim']*3,
-                        kv_gate = True
+                        hidden_dim = args['latent_dim']*3
                     )
                 ]*8,
             )
@@ -253,8 +249,7 @@ def SSMArgs(name):
                     ),
                     dict(
                         name = "MLP",
-                        k_size = args['latent_dim']*3,
-                        kv_gate = True
+                        hidden_dim = args['latent_dim']*3
                     )
                 ]*8,
             )

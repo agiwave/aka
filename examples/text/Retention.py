@@ -99,10 +99,8 @@ def RetentionArgs(name):
         bias = False, # bias in Linear?
     )
     mlp_args = nn.Object(
-        name = 'MLP',
-        k_dim = 64,
-        k_size = 384 * 3,
-        kv_gate = False,
+        name = 'Xproj',
+        hidden_dim = 384 * 3
     ),
     attn_args = nn.Object(
         name = 'Retention',
@@ -123,7 +121,7 @@ def RetNet(name):
     # -- Tokenizer --
     tokenizer = repo.AutoTokenizer(name)
     cfg = repo.fopen(name, 'config.json', ftype='json')
-    args = nn.Object(
+    args = dict(
         tokenizer = tokenizer,
         vocab_size = cfg['vocab_size'],
         embedding_scale = True,
@@ -133,15 +131,16 @@ def RetNet(name):
         bias = False,
         dropout = cfg['dropout'],
         layers = [
-            nn.Object(
+            dict(
                 name = 'Retention',
                 num_heads = cfg['decoder_retention_heads'],
                 hidden_dim = cfg['decoder_value_embed_dim'],
             ), 
-            nn.Object(
-                name = 'MLP',
-                k_size = cfg['decoder_ffn_embed_dim'],
-                kv_gate = cfg['use_glu'],
+            dict(
+                name = 'Xproj',
+                hidden_dim = cfg['decoder_ffn_embed_dim'],
+                v_gate = cfg['use_glu'],
+                o_gate = False,
                 activation = cfg['activation_fn']
             )
         ]*cfg['decoder_layers']
@@ -168,9 +167,11 @@ def RetNet(name):
                     m.layers[i*2+1].norm.weight.copy_(f.get_tensor(f'model.layers.{i}.final_layer_norm.weight'))
 
                     # Take care here. gate and fc1 are just swaped.
-                    m.layers[i*2+1].layer.gate_proj.data.copy_(f.get_tensor(f'model.layers.{i}.ffn.fc1.weight'))
-                    m.layers[i*2+1].layer.up_proj.data.copy_(f.get_tensor(f'model.layers.{i}.ffn.gate.weight'))
-                    m.layers[i*2+1].layer.down_proj.data.copy_(f.get_tensor(f'model.layers.{i}.ffn.fc2.weight'))
+                    m.layers[i*2+1].layer.copy_xproj_weights(
+                        [f.get_tensor(f'model.layers.{i}.ffn.gate.weight'),
+                        f.get_tensor(f'model.layers.{i}.ffn.fc1.weight')],
+                        f.get_tensor(f'model.layers.{i}.ffn.fc2.weight')
+                    )
     return m
 
 if __name__ == "__main__":

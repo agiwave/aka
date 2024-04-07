@@ -3,10 +3,9 @@ import aka.numpy as np
 
 def RomeSetArgs(name):
     mlp_args = dict(
-        name = 'MLP',
+        name = 'Xproj',
         k_dim = 384,
-        k_size = 384 * 3,
-        kv_gate = False,
+        hidden_dim = 384 * 3,
         RWKV_Ver = None
     )
     attn_args = dict(
@@ -123,7 +122,7 @@ def RomeSetArgs(name):
                 latent_dim = 512,
                 num_heads = 8,
                 num_kv_groups = 8,
-                k_size = 512*3,
+                hidden_dim = 512*3,
             ))
 
         case _:
