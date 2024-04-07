@@ -1,7 +1,7 @@
 
 import os
 os.environ["aka_provider_name"] = "aka.providers.torch"
-os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+# os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 import aka.nn as nn
 
 def MNIST(num_channels=1, num_classes=10):
