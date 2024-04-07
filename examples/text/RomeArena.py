@@ -88,7 +88,7 @@ def TrainRoles(roles, *, dataset=None, tokenizer='data/RomeArena', save_dir="dat
     # -- Plot --
     losses = [train(r, **kwargs) for r in players]
     if show:
-        Plot([r.name for r in players], losses)
+        PlotRoles([r.name for r in players], losses)
     return losses
 
 def PlotRoles(roles, losses):
