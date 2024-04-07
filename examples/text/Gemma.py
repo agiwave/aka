@@ -23,8 +23,7 @@ def GemmaArgs(name, tokenizer='data/Gemma/tokenizer.model'):
     mlp_args = dict(
         name = "Xproj",
         hidden_dim = 0,
-        v_gate = True,
-        o_gate = False
+        gate = 'gh',
     )
     attn_args = dict(
         name = 'Attention',

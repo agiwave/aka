@@ -139,8 +139,7 @@ def RetNet(name):
             dict(
                 name = 'Xproj',
                 hidden_dim = cfg['decoder_ffn_embed_dim'],
-                v_gate = cfg['use_glu'],
-                o_gate = False,
+                gate = 'gh' if cfg['use_glu'] else None,
                 activation = cfg['activation_fn']
             )
         ]*cfg['decoder_layers']

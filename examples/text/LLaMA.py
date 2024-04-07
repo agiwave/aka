@@ -23,8 +23,7 @@ def LLaMA(name):
             dict(
                 name = 'Xproj',
                 hidden_dim = 4096*4,   # ???
-                v_gate = True,
-                o_gate = False
+                gate = 'gh'
             )
         ]*32,
         dropout = 0.2,

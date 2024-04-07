@@ -17,10 +17,14 @@ def XprojBlock(**kwargs):
         self.hidden_dim = getattr(args, 'hidden_dim', args.latent_dim)
         self.num_heads = getattr(args, 'num_heads', 1)
         self.k_dim = getattr(args, 'k_dim', 0)
-        self.vg_dim = self.hidden_dim if getattr(args, 'v_gate', False) else 0
-        self.og_dim = args.latent_dim if getattr(args, 'o_gate', True) else 0
+        match getattr(args, 'gate', None):
+            case 'gh':
+                (self.vg_dim, self.og_dim) = (self.hidden_dim, 0)
+            case 'go':
+                (self.vg_dim, self.og_dim) = (0, args.latent_dim)
+            case _:
+                (self.vg_dim, self.og_dim) = (0, 0)
         self.act = getattr(np, getattr(args, 'activation', 'gelu'))
-
         assert args.latent_dim % self.num_heads == 0
         assert self.hidden_dim % self.num_heads == 0
         assert self.k_dim % self.num_heads == 0
@@ -81,7 +85,7 @@ def XprojBlock(**kwargs):
         (vg, og, shape) = g
         (b, l, _) = shape
         x = x if self.dropout is None else self.dropout(x)
-        x = x if self.vg_dim == 0 else self.act(vg) * x
+        x = self.act(x) if self.vg_dim == 0 else self.act(vg) * x
         x = x.view(b, l, -1, self.num_heads)    # mix heads
         x = np.einsum('b l v h , h d v -> b l h d', x, self.out_proj)
         x = x if self.og_dim == 0 else self.act(og) * x
