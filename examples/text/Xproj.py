@@ -84,7 +84,7 @@ def XprojBlock(**kwargs):
         # mixers
         if self.mixers is not None:
             for mixer in self.mixers:
-                x = mixer(x, ik=ik, vk=vk, state=state)
+                x = mixer(x, k=(ik, vk), state=state)
                 
         return (ik, vk, x, (hg, og, (b,l,d)))
 

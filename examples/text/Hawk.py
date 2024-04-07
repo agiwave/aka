@@ -12,10 +12,6 @@ def HawkBlock(**kwargs):
     def __init__(self, **kwargs):
         args = nn.Object(**kwargs)
 
-        # from MetaMixer import MetaMixerBlock
-        # self.xproj = None if getattr(args, 'xproj', True) else self.xproj = MetaMixerBlock(**kwargs)
-
-        self.xproj = getattr(args, 'xproj', True)
         self.hidden_dim = getattr(args, 'hidden_dim', args.latent_dim)
         self.num_heads = getattr(args, 'num_heads', 8)
         assert self.hidden_dim % self.num_heads == 0
@@ -30,12 +26,12 @@ def HawkBlock(**kwargs):
         self.delta = nn.Parameter(np.array(0.5))
         return self
 
-    def forward(self, x, ik=None, vk=None, state=None, **kwargs):
+    def forward(self, x, k=None, state=None, **kwargs):
         (b, l, d) = x.shape
         if self.xproj is not None:
             (rg, ig, x, go) = self.xproj.proj_in(x)
         else:
-            (rg, ig) = (vk, ik)
+            (rg, ig) = k
 
         # -- RG_LRU or GRU --
         rg = rg.unsqueeze(-1)
