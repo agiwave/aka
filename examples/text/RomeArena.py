@@ -53,6 +53,7 @@ def TrainRoles(roles, *, dataset=None, tokenizer='data/RomeArena', save_dir="dat
             ))
         else:
             players.append(dict(
+                name = role['name'],
                 args = dict(
                     role,
                     tokenizer = tokenizer,
