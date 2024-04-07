@@ -7,7 +7,7 @@ def XprojBlock(**kwargs):
     Args:
         latent_dim:       (required)
         hidden_dim:       latent_dim (default)
-        num_heads:        8 (default)
+        num_heads:        1 (default)
     '''
     def __init__(self, **kwargs):
         args = nn.Object(**kwargs)
@@ -19,20 +19,20 @@ def XprojBlock(**kwargs):
         self.k_dim = getattr(args, 'k_dim', 0)
         match getattr(args, 'gate', None):
             case 'gh':
-                (self.vg_dim, self.og_dim) = (self.hidden_dim, 0)
+                (self.hg_dim, self.og_dim) = (self.hidden_dim, 0)
             case 'go':
-                (self.vg_dim, self.og_dim) = (0, args.latent_dim)
+                (self.hg_dim, self.og_dim) = (0, args.latent_dim)
             case _:
-                (self.vg_dim, self.og_dim) = (0, 0)
+                (self.hg_dim, self.og_dim) = (0, 0)
         self.act = getattr(np, getattr(args, 'activation', 'gelu'))
         assert args.latent_dim % self.num_heads == 0
         assert self.hidden_dim % self.num_heads == 0
         assert self.k_dim % self.num_heads == 0
 
-        # ik, vk, v, vg, og
+        # ik, vk, v, hg, og
         self.in_proj = nn.Parameter(shape=(
             self.num_heads,
-            (2 * self.k_dim + self.hidden_dim + self.vg_dim + self.og_dim)//self.num_heads,
+            (2 * self.k_dim + self.hidden_dim + self.hg_dim + self.og_dim)//self.num_heads,
             args.latent_dim//self.num_heads)
         )
 
@@ -77,15 +77,15 @@ def XprojBlock(**kwargs):
         # Inproj
         x = x.view(b, l, self.num_heads, -1)
         xprojs = np.einsum('b l h d, h v d->b l h v', x, self.in_proj)
-        split_dims = [self.k_dim, self.k_dim, self.hidden_dim, self.vg_dim, self.og_dim]
-        (ik, vk, x, vg, og) = xprojs.split([dim//self.num_heads for dim in split_dims], dim=-1)
-        return (ik, vk, x, (vg, og, (b,l,d)))
+        split_dims = [self.k_dim, self.k_dim, self.hidden_dim, self.hg_dim, self.og_dim]
+        (ik, vk, x, hg, og) = xprojs.split([dim//self.num_heads for dim in split_dims], dim=-1)
+        return (ik, vk, x, (hg, og, (b,l,d)))
 
     def proj_out(self, x, g, **kwargs):
-        (vg, og, shape) = g
+        (hg, og, shape) = g
         (b, l, _) = shape
         x = x if self.dropout is None else self.dropout(x)
-        x = self.act(x) if self.vg_dim == 0 else self.act(vg) * x
+        x = self.act(x) if self.hg_dim == 0 else self.act(hg) * x
         x = x.view(b, l, -1, self.num_heads)    # mix heads
         x = np.einsum('b l v h , h d v -> b l h d', x, self.out_proj)
         x = x if self.og_dim == 0 else self.act(og) * x
