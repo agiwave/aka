@@ -17,49 +17,29 @@ def HawkBlock(**kwargs):
 
         self.xproj = getattr(args, 'xproj', True)
         self.hidden_dim = getattr(args, 'hidden_dim', args.latent_dim)
-        self.v_gate_dim = self.hidden_dim if getattr(args, 'v_gate', False) else 0
-        self.o_gate_dim = args.latent_dim if getattr(args, 'o_gate', True) else 0
         self.num_heads = getattr(args, 'num_heads', 8)
         assert self.hidden_dim % self.num_heads == 0
         # rg, ig, v, vg, og
-        if self.xproj:
-            self.in_proj = nn.Linear(args.latent_dim, self.num_heads*2 + self.hidden_dim + self.v_gate_dim + self.o_gate_dim, bias=args.bias)
-            from Conv1d import Conv1dBlock
-            self.prev_conv = None if not getattr(args, 'prev_conv', True) else Conv1dBlock(**kwargs)
-            self.post_conv = None if not getattr(args, 'prev_conv', True) else Conv1dBlock(**kwargs)
-            self.out_proj = nn.Linear(self.hidden_dim, args.latent_dim, bias=args.bias)
+        if getattr(args, 'xproj', True):
+            from Xproj import XprojBlock
+            self.xproj = XprojBlock(**dict(kwargs, num_heads=1, k_dim=self.num_heads))
+        else:
+            self.xproj = None
 
         self.c = nn.Parameter(np.array(-8.), requires_grad=False)
         self.delta = nn.Parameter(np.array(0.5))
         return self
 
-    def conv(x, k, kernel_size, state, key):
-        (b, l, d) = x.shape
-        x = np.rearrange('b l d->b d l', x)
-        if state is not None:
-            conv_state = state.get(key,None)
-            if conv_state is not None:
-                x = np.cat((state[key], x), dim=2)
-            state[key] = x[:, :, (1 - kernel_size):].detach()
-        if x.size(2) < l + kernel_size - 1:
-            x = np.pad(x, (l + kernel_size - 1 - x.size(2), 0), mode='replicate')
-        x = k(x)
-        x = np.silu(x)
-        return np.rearrange('b d l->b l d', x)
-
     def forward(self, x, ik=None, vk=None, state=None, **kwargs):
         (b, l, d) = x.shape
-        if self.xproj:
-            (rg, ig, x, vg, og) = self.in_proj(x).split([self.num_heads, self.num_heads, self.hidden_dim, self.v_gate_dim, self.o_gate_dim], dim=-1)
-            rg = rg.unsqueeze(-1)
-            ig = ig.unsqueeze(-1)
-
-            # -- Prev Conv -- 
-            x = x if self.prev_conv is not None else self.prev_conv(x, state)
+        if self.xproj is not None:
+            (rg, ig, x, go) = self.xproj.proj_in(x)
         else:
             (rg, ig) = (vk, ik)
 
         # -- RG_LRU or GRU --
+        rg = rg.unsqueeze(-1)
+        ig = ig.unsqueeze(-1)
         rg = np.sigmoid(rg)
         rg = ((self.c * np.softplus(self.delta)) * rg)  # [B,L,H]
 
@@ -94,12 +74,8 @@ def HawkBlock(**kwargs):
         x = np.rearrange('b l h d->b l (h d)',x)
 
         # Gate and Output
-        if self.xproj:
-            # -- Post Conv -- 
-            x = x if self.post_conv is None else self.post_conv(x, state)
-
-            x = x if self.v_gate_dim <= 0 else x * np.gelu(vg)
-            return self.out_proj(x) if self.o_gate_dim <=0 else self.out_proj(x) * np.gelu(og)
+        if self.xproj is not None:
+            return self.xproj.proj_out(x, go)
         else:
             return x
     return __init__(nn.Module(forward = forward),**kwargs)
@@ -117,29 +93,32 @@ def HawkArgs(name):
         dropout = 0.1,
         bias = False, # bias in Linear?
     )
+    hawk_args = dict(
+        name = 'Hawk',
+        num_heads = 8,
+        mixers = [
+            dict(
+                name = 'Conv1d'
+            ),
+        ]
+    )
     match(name):
         case 'Hawk':
             return dict(
                 args,
                 layers = [
+                    hawk_args,
                     dict(
-                        name = 'Hawk',
-                        num_heads = 8,
-                    ),
-                    dict(
-                        name = "MLP",
+                        name = "Xproj",
                         hidden_dim = args['latent_dim']*3,
-                        kv_gate = True
+                        gate = 'go'
                     )
                 ]*8,
             )
         case 'HawkOnly':
             return dict(
                 args,
-                layers = [dict(
-                    name = 'Hawk',
-                    num_heads = 8
-                )]*16,
+                layers = [hawk_args]*16,
             )
         case 'Griffin':
             return dict(
@@ -154,16 +133,13 @@ def HawkArgs(name):
                     dict(
                         name = 'Xproj',
                         hidden_dim = args['latent_dim']*3,
-                        kv_gate = True
+                        gate = 'go'
                     ),
-                    dict(
-                        name = 'Hawk',
-                        num_heads = 8,
-                    ),
+                    hawk_args,
                     dict(
                         name = 'Xproj',
                         hidden_dim = args['latent_dim']*3,
-                        kv_gate = True
+                        gate = 'go'
                     ),
                 ]*4,
             )

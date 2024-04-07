@@ -72,13 +72,22 @@ def XprojBlock(**kwargs):
         self.in_proj.copy_(in_proj)
         self.out_proj.copy_(out_proj)
 
-    def proj_in(self, x, **kwargs):
+    def proj_in(self, x, state=None, **kwargs):
         (b, l, d) = x.shape
         # Inproj
         x = x.view(b, l, self.num_heads, -1)
         xprojs = np.einsum('b l h d, h v d->b l h v', x, self.in_proj)
         split_dims = [self.k_dim, self.k_dim, self.hidden_dim, self.hg_dim, self.og_dim]
         (ik, vk, x, hg, og) = xprojs.split([dim//self.num_heads for dim in split_dims], dim=-1)
+        ik = np.reshape(ik, (b, l, -1))
+        vk = np.reshape(ik, (b, l, -1))
+        x = np.reshape(x, (b, l, -1))
+        
+        # mixers
+        if self.mixers is not None:
+            for mixer in self.mixers:
+                x = mixer(x, ik=ik, vk=vk, state=state)
+                
         return (ik, vk, x, (hg, og, (b,l,d)))
 
     def proj_out(self, x, g, **kwargs):
@@ -91,21 +100,8 @@ def XprojBlock(**kwargs):
         x = x if self.og_dim == 0 else self.act(og) * x
         return np.reshape(x, shape)
 
-    def forward(self, x, state=None, mixer=None, **kwargs):
-        (b, l, d) = x.shape
-        (ik, vk, x, g) = self.proj_in(x)
-
-        # mixers
-        if self.mixers is not None:
-            x_shape = x.shape
-            x = np.reshape(x, (b,l,-1))
-            if mixer is None:
-                for mixer in self.mixers:
-                    x = mixer(x, ik=ik, vk=vk, state=state)
-            else:
-                x = mixer(x, ik=ik, iv=iv, state=state)
-            x = x.view(x_shape)
-
+    def forward(self, x, state=None, **kwargs):
+        (_, _, x, g) = self.proj_in(x)
         return self.proj_out(x, g)
     return __init__(nn.Module(forward = forward, proj_in=proj_in, proj_out=proj_out, copy_xproj_weights=copy_xproj_weights),**kwargs)
 
