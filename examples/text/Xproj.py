@@ -79,10 +79,8 @@ def XprojBlock(**kwargs):
         xprojs = np.einsum('b l h d, h v d->b l h v', x, self.in_proj)
         split_dims = [self.k_dim, self.k_dim, self.hidden_dim, self.hg_dim, self.og_dim]
         (ik, vk, x, hg, og) = xprojs.split([dim//self.num_heads for dim in split_dims], dim=-1)
-        ik = np.reshape(ik, (b, l, -1))
-        vk = np.reshape(ik, (b, l, -1))
-        x = np.reshape(x, (b, l, -1))
-        
+        (ik, vk, x, hg, og) = [np.rearrange('b l h d->b l (h d)', item) for item in [ik, vk, x, hg, og]]
+
         # mixers
         if self.mixers is not None:
             for mixer in self.mixers:
