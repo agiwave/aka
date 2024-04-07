@@ -20,7 +20,7 @@ def SSMBlock(**kwargs):
         # rg, ig, v, g
         if getattr(args, 'xproj', True):
             from Xproj import XprojBlock
-            self.xproj = XprojBlock(**dict(kwargs, num_heads=1, k_dims=[self.k_dim, self.num_heads, self.num_heads, self.num_heads]))
+            self.xproj = XprojBlock(**dict(kwargs, k_dims=[self.k_dim, self.num_heads, self.num_heads, self.num_heads]))
         else:
             self.xproj = None
         assert self.hidden_dim % self.num_heads == 0

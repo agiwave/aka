@@ -7,9 +7,9 @@ def XprojBlock(**kwargs):
     Args:
         latent_dim:       (required)
         hidden_dim:       latent_dim (default)
-        num_heads:        1 (default)
+        xproj_heads:        1 (default)
     Example:
-        1, FFN/MLP: XprojBlock(num_heads = 1, gate='gh', latent_dim, hidden_dim)
+        1, FFN/MLP: XprojBlock(xproj_heads = 1, gate='gh', latent_dim, hidden_dim)
         2, Attention: 
     '''
     def __init__(self, **kwargs):
@@ -18,7 +18,7 @@ def XprojBlock(**kwargs):
         dropout = getattr(args, 'dropout', 0.2)
 
         self.hidden_dim = getattr(args, 'hidden_dim', args.latent_dim)
-        self.num_heads = getattr(args, 'num_heads', 1)
+        self.xproj_heads = getattr(args, 'xproj_heads', 1)
         self.k_dims = getattr(args, 'k_dims', [])
         match getattr(args, 'gate', None):
             case 'gh':
@@ -28,18 +28,18 @@ def XprojBlock(**kwargs):
             case _:
                 (self.hg_dim, self.og_dim) = (0, 0)
         self.act = getattr(np, getattr(args, 'activation', 'gelu'))
-        assert args.latent_dim % self.num_heads == 0
-        assert self.hidden_dim % self.num_heads == 0
+        assert args.latent_dim % self.xproj_heads == 0
+        assert self.hidden_dim % self.xproj_heads == 0
 
         # ik, vk, v, hg, og
         k_sum_dim = 0
         for k_dim in self.k_dims:
             k_sum_dim += k_dim
-            assert k_dim % self.num_heads == 0
+            assert k_dim % self.xproj_heads == 0
         self.in_proj = nn.Parameter(shape=(
-            self.num_heads,
-            (k_sum_dim + self.hidden_dim + self.hg_dim + self.og_dim)//self.num_heads,
-            args.latent_dim//self.num_heads)
+            self.xproj_heads,
+            (k_sum_dim + self.hidden_dim + self.hg_dim + self.og_dim)//self.xproj_heads,
+            args.latent_dim//self.xproj_heads)
         )
 
         # mixers
@@ -63,28 +63,28 @@ def XprojBlock(**kwargs):
 
         # o
         self.out_proj = nn.Parameter(shape=(
-            self.num_heads,
-            args.latent_dim // self.num_heads,
-            self.hidden_dim // self.num_heads
+            self.xproj_heads,
+            args.latent_dim // self.xproj_heads,
+            self.hidden_dim // self.xproj_heads
         ))
         self.dropout = nn.Dropout(dropout)
         return self
 
     def copy_xproj_weights(self, in_projs, out_proj):
         in_proj = np.cat(in_projs, dim=0)
-        in_proj = np.rearrange('(h d) k->h d k', in_proj, h=self.num_heads)
+        in_proj = np.rearrange('(h d) k->h d k', in_proj, h=self.xproj_heads)
 
-        out_proj = np.rearrange('(h d) k->h d k', out_proj, h=self.num_heads)
+        out_proj = np.rearrange('(h d) k->h d k', out_proj, h=self.xproj_heads)
         self.in_proj.copy_(in_proj)
         self.out_proj.copy_(out_proj)
 
     def proj_in(self, x, state=None, **kwargs):
         (b, l, d) = x.shape
         # Inproj
-        x = x.view(b, l, self.num_heads, -1)
+        x = x.view(b, l, self.xproj_heads, -1)
         xprojs = np.einsum('b l h d, h v d->b l h v', x, self.in_proj)
         split_dims = self.k_dims + [self.hidden_dim, self.hg_dim, self.og_dim]
-        splits = xprojs.split([dim//self.num_heads for dim in split_dims], dim=-1)
+        splits = xprojs.split([dim//self.xproj_heads for dim in split_dims], dim=-1)
         splits = [np.rearrange('b l h d->b l (h d)', item) for item in splits]
         (x, hg, og) = splits[-3], splits[-2], splits[-1]
         k = splits[:-3]
@@ -106,7 +106,7 @@ def XprojBlock(**kwargs):
         (b, l, _) = shape
         x = x if self.dropout is None else self.dropout(x)
         x = self.act(x) if self.hg_dim == 0 else self.act(hg) * x
-        x = x.view(b, l, -1, self.num_heads)    # mix heads
+        x = x.view(b, l, -1, self.xproj_heads)    # mix heads
         x = np.einsum('b l v h , h d v -> b l h d', x, self.out_proj)
         x = np.reshape(x, shape)
         return x if self.og_dim == 0 else self.act(og) * x
@@ -119,7 +119,7 @@ def XprojBlock(**kwargs):
 def XprojArgs(name):
     layer = dict(
         name = 'Xproj',
-        num_heads = 8,
+        xproj_heads = 8,
         k_dim = 8,
         mixers = [
             dict(
