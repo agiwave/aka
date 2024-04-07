@@ -42,9 +42,9 @@ def RetentionBlock(**kwargs):
         slen = pos+L
         emb = cache.get('rotary_emb', None)
         if emb is None or len(emb[0]) < slen:
-            angle = 1.0 / (10000 ** np.linspace(0, 1, D//2))
+            angle = 1.0 / (10000 ** np.linspace(0, 1, D//2, dtype=x.dtype, device=x.device))
             angle = angle.unsqueeze(-1).repeat(1, 2).flatten()
-            index = np.arange(slen)
+            index = np.arange(slen, dtype=x.dtype, device=x.device)
             sin = np.sin(index[:, None] * angle[None, :])
             cos = np.cos(index[:, None] * angle[None, :])
             cache['rotary_emb'] = (sin, cos)
