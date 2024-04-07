@@ -29,7 +29,7 @@ def HawkBlock(**kwargs):
     def forward(self, x, k=None, state=None, **kwargs):
         (b, l, d) = x.shape
         if self.xproj is not None:
-            ((rg, ig), x, go) = self.xproj.proj_in(x)
+            ((rg, ig), x, go) = self.xproj.proj_in(x, state=state)
         else:
             (rg, ig) = k
 

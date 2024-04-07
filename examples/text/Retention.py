@@ -7,17 +7,14 @@ def RetentionBlock(**kwargs):
         self.embed_dim = args.latent_dim
         self.value_dim = getattr(args, 'hidden_dim', args.latent_dim)
         self.num_heads = args.num_heads
-        self.head_dim = self.value_dim // self.num_heads
-        self.key_dim = self.embed_dim // self.num_heads
-        self.scaling = self.key_dim**-0.5
-        self.gate_fn = np.silu
+        self.scaling = (self.embed_dim // self.num_heads)**-0.5
 
-        self.q_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=args.bias)
-        self.k_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=args.bias)
-        self.v_proj = nn.Linear(self.embed_dim, self.value_dim, bias=args.bias)
-        self.g_proj = nn.Linear(self.embed_dim, self.value_dim, bias=args.bias)
-        self.out_proj = nn.Linear(self.value_dim, self.embed_dim, bias=args.bias)
-        self.group_norm = nn.RMSNorm(self.head_dim)
+        if getattr(args, 'xproj', True):
+            from Xproj import XprojBlock
+            self.xproj = XprojBlock(**dict(kwargs, kv_dims=[self.embed_dim, self.embed_dim, self.value_dim]))
+        else:
+            self.xproj = None
+        self.group_norm = nn.RMSNorm(self.value_dim // self.num_heads)
         self.decay = nn.Parameter(
             data=np.log(1 - 2 ** (-5 - np.arange(self.num_heads, dtype=np.float))),
             requires_grad=getattr(args,'lr',False)
@@ -58,9 +55,14 @@ def RetentionBlock(**kwargs):
         y = np.stack((-x2, x1), dim=-1).flatten(-2)
         return (x * cos[pos:pos+L]) + (y * sin[pos:pos+L])
 
-    def forward(self, x, cache={}, state=None, **kwargs): 
+    def forward(self, x, k=None, cache={}, state=None, **kwargs): 
+        if self.xproj is not None:
+            ((q, k), v, go) = self.xproj.proj_in(x, state=state)
+        else:
+            ((q, k), v) = (k, x)
+
         B, T, H = x.size()
-        q, k, v, g = [proj(x) for proj in [self.q_proj, self.k_proj, self.v_proj, self.g_proj]]
+        # q, k, v, g = [proj(x) for proj in [self.q_proj, self.k_proj, self.v_proj, self.g_proj]]
         q, k, v = [t.view(B, T, self.num_heads, -1) for t in [q,k,v]]
         k *= self.scaling
 
@@ -85,10 +87,12 @@ def RetentionBlock(**kwargs):
                 y += np.einsum('bhld,bhvd,bhl->blhv', q, prev_S, decay)
             state["prev_S"] = current_S.detach()
 
-        # norm
-        normed = self.group_norm(y).reshape(B, x.size(1), self.value_dim)
-        out = self.gate_fn(g) * normed
-        return self.out_proj(out)
+        # Gate and Output
+        y = self.group_norm(y).reshape(B, y.size(1), self.value_dim)
+        if self.xproj is not None:
+            return self.xproj.proj_out(y, go)
+        else:
+            return y
     return __init__(nn.Module(forward=forward), **kwargs)
 
 def RetentionArgs(name):
@@ -135,6 +139,8 @@ def RetNet(name):
                 name = 'Retention',
                 num_heads = cfg['decoder_retention_heads'],
                 hidden_dim = cfg['decoder_value_embed_dim'],
+                gate = 'gh',
+                activation = 'silu'
             ), 
             dict(
                 name = 'Xproj',
@@ -158,11 +164,15 @@ def RetNet(name):
                 m.prev_norm.weight.copy_(f.get_tensor(f'model.layernorm_embedding.weight'))
                 for i in range(len(m.layers)//2):
                     m.layers[i*2].norm.weight.copy_(f.get_tensor(f'model.layers.{i}.retention_layer_norm.weight'))
-                    m.layers[i*2].layer.q_proj.weight.copy_(f.get_tensor(f'model.layers.{i}.retention.q_proj.weight'))
-                    m.layers[i*2].layer.g_proj.weight.copy_(f.get_tensor(f'model.layers.{i}.retention.g_proj.weight'))
-                    m.layers[i*2].layer.k_proj.weight.copy_(f.get_tensor(f'model.layers.{i}.retention.k_proj.weight'))
-                    m.layers[i*2].layer.v_proj.weight.copy_(f.get_tensor(f'model.layers.{i}.retention.v_proj.weight'))
-                    m.layers[i*2].layer.out_proj.weight.copy_(f.get_tensor(f'model.layers.{i}.retention.out_proj.weight'))
+                    m.layers[i*2].layer.xproj.copy_xproj_weights(
+                        [
+                            f.get_tensor(f'model.layers.{i}.retention.q_proj.weight'),
+                            f.get_tensor(f'model.layers.{i}.retention.k_proj.weight'),
+                            f.get_tensor(f'model.layers.{i}.retention.v_proj.weight'),
+                            f.get_tensor(f'model.layers.{i}.retention.g_proj.weight')
+                        ],
+                        f.get_tensor(f'model.layers.{i}.retention.out_proj.weight')
+                    )
                     m.layers[i*2+1].norm.weight.copy_(f.get_tensor(f'model.layers.{i}.final_layer_norm.weight'))
 
                     # Take care here. gate and fc1 are just swaped.

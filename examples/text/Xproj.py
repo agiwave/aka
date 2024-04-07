@@ -29,7 +29,7 @@ def XprojBlock(**kwargs):
                 (self.hg_dim, self.og_dim) = (0, 0)
 
         act = getattr(args, 'activation', None)
-        self.act = None if act is None else getattr(np, act)
+        self.act = None if act is None else getattr(np, act, None)
         assert args.latent_dim % self.xproj_heads == 0
         assert self.hidden_dim % self.xproj_heads == 0
 

@@ -34,7 +34,7 @@ def SSMBlock(**kwargs):
     def forward(self, x, k=None, state=None,  **kwargs):
         (b, l, d) = x.shape
         if self.xproj is not None:
-            ((C, A, B, gv), v, go) = self.xproj.proj_in(x)
+            ((C, A, B, gv), v, go) = self.xproj.proj_in(x, state=state)
         else:
             (C, A, B, gv) = k
 

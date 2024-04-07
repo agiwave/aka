@@ -85,12 +85,12 @@ def AttentionBlock(**kwargs):
         B, L, _ = x.size()
 
         # -- qkv --
-        num_heads, num_kv_groups = self.num_heads, self.num_kv_groups
         if self.xproj is not None:
-            ((q, k), v, go) = self.xproj.proj_in(x)
+            ((q, k), v, go) = self.xproj.proj_in(x, state=state)
         else:
             ((q, k), v) = (k, x)
 
+        num_heads, num_kv_groups = self.num_heads, self.num_kv_groups
         q = q.view(B, L, num_heads, -1)
         k = k.view(B, L, num_kv_groups, -1)
         v = v.view(B, L, num_kv_groups, -1)
