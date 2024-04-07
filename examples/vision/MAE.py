@@ -119,7 +119,7 @@ def MAE(encoder_layers='', decoder_layers='', mask_ratio=0.6, **kwargs):
 
         # -- Forward --
         nn.Module(
-            forward, 
+            forward = forward, 
             # pos_embedding = nn.Parameter(shape=(L,D)),
             pos_embedding = pos_embedding,
             encoder = nn.Sequential(

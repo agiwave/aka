@@ -25,7 +25,7 @@ def VAE(input_dim, dim, n_hiddens):
         return outputs, loss
 
     return nn.Module(
-        forward, 
+        forward=forward, 
         encoder = nn.Sequential(
             nn.Linear(input_dim, n_hiddens),
             nn.ReLU(),

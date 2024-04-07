@@ -36,7 +36,7 @@ def RQVAE(vq, ae, n_dims=3):
         return outputs, loss_recons + loss_vq
 
     return nn.Module(
-        forward,
+        forward = forward,
         vq = vq,
         ae = ae, 
     )

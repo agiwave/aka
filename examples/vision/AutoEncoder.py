@@ -13,7 +13,7 @@ def AutoEncoder(encoder, decoder):
         return outputs, np.mse_loss(inputs, outputs)
 
     return nn.Module(
-        forward,
+        forward = forward,
         encoder = encoder,
         decoder = decoder,
         encode = encode,

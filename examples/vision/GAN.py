@@ -28,7 +28,7 @@ def GAN(model, discriminator, disc_factor=1.0):
         return outputs, ((model, q_loss), (discriminator, gan_loss))
 
     return nn.Module(
-        forward, 
+        forward = forward, 
         model = model,
         discriminator = discriminator
     )

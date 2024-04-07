@@ -51,7 +51,7 @@ def CVAE(input_dim, dim, n_hiddens, n_classes):
         return outputs, loss
 
     return nn.Module(
-        forward, 
+        forward = forward, 
         encoder = Enc(input_dim, dim, n_hiddens, n_classes),
         decoder = Dec(input_dim, dim, n_hiddens, n_classes)
     )

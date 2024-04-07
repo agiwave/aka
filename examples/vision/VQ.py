@@ -31,7 +31,7 @@ def VectorQuantizer(dim, n_embedding, beta=1.0):
 
     embedding = nn.Embedding(n_embedding, dim)
     embedding.weight.data.uniform_(-1.0 / n_embedding, 1.0 / n_embedding)
-    return nn.Module(forward, embedding = embedding)
+    return nn.Module(forward = forward, embedding = embedding)
     
 def VectorQuantizer2d(num_heads, embedding_dim, num_embeddings=256, beta=0.25):
     '''
@@ -87,7 +87,7 @@ def VectorQuantizer2d(num_heads, embedding_dim, num_embeddings=256, beta=0.25):
 
     embedding = nn.Embedding(num_embeddings, embedding_dim*num_heads)
     embedding.weight.data.uniform_(-1.0 / num_embeddings, 1.0 / num_embeddings)
-    return nn.Module(forward, embedding = embedding)
+    return nn.Module(forward = forward, embedding = embedding)
     
 # --- Example ---
 if __name__ == "__main__":
