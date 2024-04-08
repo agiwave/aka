@@ -103,8 +103,8 @@ def CausalLM(**kwargs):
         # -- latent_dim --> vocab_dim
         if self.vocab_dim != self.latent_dim:
             if self.vocab_mode is None:
-                n = self.latent_dim // self.vocab_dim
-                h = np.arrange(n, dtype=x.dtype, device=x.device).unsqueeze(-1)
+                # n = self.latent_dim // self.vocab_dim
+                # h = np.arange(n, dtype=x.dtype, device=x.device).unsqueeze(-1)
                 x = np.rearrange('b l (n d)->b l n d', x, n=n)
                 x = np.softmax(x, dim=-2)
                 x = np.einsum('b l n d->b l d', x*h) / (n-1)
