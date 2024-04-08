@@ -121,39 +121,68 @@ def XprojBlock(**kwargs):
         return self.proj_out(x, g)
     return __init__(nn.Module(forward = forward, proj_in=proj_in, proj_out=proj_out, copy_xproj_weights=copy_xproj_weights),**kwargs)
 
-def XprojArgs(name):
-    layer = dict(
-        name = 'Xproj',
-        xproj_heads = 8,
-        k_dim = 8,
-        mixers = [
-            dict(
-                name = 'Conv1d'
-            ),
-            dict(
-                name = 'Hawk',
-            )
-        ],
-        conv_kernel_size = 4
-    )
-    args = dict(
-        vocab_dim = 32,
-        latent_dim = 384,
-        layers = [layer]*16,
-        resident_gate = True,
-        dropout = 0.1,
-        bias = False # bias in Linear?
-    )
-    match(name):
-        case 'tiny':
-            return args
-        case _:
-            assert False
-
 if __name__ == "__main__":
+    def XprojArgs(name):
+        layer = dict(
+            mixers = [
+                dict(
+                    name = 'Conv1d'
+                )
+            ],
+            conv_kernel_size = 4
+        )
+        args = dict(
+            name = name,
+            vocab_dim = 64,
+            latent_dim = 512,
+            resident_gate = True,
+            dropout = 0.1,
+            bias = False # bias in Linear?
+        )
+        match(name):
+            case 'Full':
+                return dict(
+                    args,
+                    latent_dim = 512,
+                    xproj_heads = 2,
+                    layers = [
+                        dict(
+                            name='Attention',
+                            rotary_embedding = True,
+                            num_heads = 16
+                        ),
+                        dict(
+                            name='Xproj',
+                            hidden_dim = 512 * 3
+                        )
+                    ]*8,
+                )
+                return args
+            case 'Tiny':
+                return dict(
+                    args,
+                    latent_dim = 1024,
+                    xproj_heads = 8,
+                    layers = [
+                        dict(
+                            name='Attention',
+                            rotary_embedding = True,
+                            num_heads = 16
+                        ),
+                        dict(
+                            name='Xproj',
+                            hidden_dim = 1024 * 3
+                        )
+                    ]*8,
+                )
+                return args
+            case _:
+                assert False
+
     from RomeArena import TrainRoles, RunRoles
     roles = [
-        'Xproj-tiny',
+        XprojArgs('Full'),
+        XprojArgs('Tiny')
     ]
     TrainRoles(roles, lr=6e-3, epochs=1)
     # RunRoles(roles, 'My lord Sebastian')
