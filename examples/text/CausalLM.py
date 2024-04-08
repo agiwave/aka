@@ -42,9 +42,13 @@ def CausalLM(**kwargs):
         self.vocab_dim = getattr(args, 'vocab_dim', args.latent_dim)
         self.train_mode = getattr(args, 'train_mode', None)
         self.vocab_mode = getattr(args, 'vocab_mode', None)
-        if self.vocab_dim != self.latent_dim and self.vocab_mode is not None:
-            self.in_proj = nn.Linear(self.vocab_dim, self.latent_dim, bias=args.bias)
-            self.out_proj = nn.Linear(self.latent_dim, self.vocab_dim, bias=args.bias)
+        if self.vocab_dim != self.latent_dim:
+            match self.vocab_mode:
+                case 'onehot':
+                    self.in_proj = None
+                case _:
+                    self.in_proj = nn.Linear(self.vocab_dim, self.latent_dim, bias=args.bias)
+                    self.out_proj = nn.Linear(self.latent_dim, self.vocab_dim, bias=args.bias)
 
         self.embedding_scale = (None if not getattr(args,'embedding_scale',False) else math.sqrt(self.vocab_dim))
         self.embedding = nn.Embedding(num_embeddings=args.vocab_size, embedding_dim=self.vocab_dim)
@@ -72,14 +76,15 @@ def CausalLM(**kwargs):
 
         # -- vocab_dim --> latent_dim
         if self.vocab_dim != self.latent_dim:
-            if self.vocab_mode is None:
-                n = self.latent_dim // self.vocab_dim
-                h = np.arange(n, dtype=x.dtype, device=x.device).unsqueeze(-1)
-                x = x.unsqueeze(-2)
-                x = np.softmax(np.exp(-((x * (n-1) - h) ** 2)), dim=-2)
-                x = np.rearrange('b l n d -> b l (n d)', x)
-            else:
-                x = self.in_proj(x)
+            match self.vocab_mode:
+                case 'onehot':
+                    n = self.latent_dim // self.vocab_dim
+                    h = np.arange(n, dtype=x.dtype, device=x.device).unsqueeze(-1)
+                    x = x.unsqueeze(-2)
+                    x = np.exp(-((x * (n-1) - h)**2))
+                    x = np.rearrange('b l n d -> b l (n d)', x)
+                case _:
+                    x = self.in_proj(x)
 
         if self.embedding_scale is not None:    # RetNet, nonsense :(. 
             x = x * self.embedding_scale
@@ -102,14 +107,15 @@ def CausalLM(**kwargs):
 
         # -- latent_dim --> vocab_dim
         if self.vocab_dim != self.latent_dim:
-            if self.vocab_mode is None:
-                # n = self.latent_dim // self.vocab_dim
-                # h = np.arange(n, dtype=x.dtype, device=x.device).unsqueeze(-1)
-                x = np.rearrange('b l (n d)->b l n d', x, n=n)
-                x = np.softmax(x, dim=-2)
-                x = np.einsum('b l n d->b l d', x*h) / (n-1)
-            else:
-                x = self.out_proj(x)
+            match self.vocab_mode:
+                case 'onehot':
+                    # n = self.latent_dim // self.vocab_dim
+                    # h = np.arange(n, dtype=x.dtype, device=x.device).unsqueeze(-1)
+                    x = np.rearrange('b l (n d)->b l n d', x, n=n)
+                    x = np.softmax(x, dim=-2)
+                    x = np.einsum('b l n d->b l d', x*h) / (n-1)
+                case _:
+                    x = self.out_proj(x)
 
         if self.post_norm is not None:
             x = self.post_norm(x)
