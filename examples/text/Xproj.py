@@ -110,7 +110,7 @@ def XprojBlock(**kwargs):
         if self.hg_dim == 0:
             x = x if self.act is None else self.act(x)
         else:
-            x = (hg if self.act is None else self.act(hg)) * x
+            x = self.act(hg) * x
         x = x.view(b, l, -1, self.xproj_heads)    # mix heads
         x = np.einsum('b l v h , h d v -> b l h d', x, self.out_proj)
         x = np.reshape(x, shape)

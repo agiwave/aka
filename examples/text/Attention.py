@@ -18,8 +18,8 @@ def AttentionBlock(**kwargs):
     Examples:
         default ==> Attention
         args.attn_args.num_heads = 8 ==> MHA: Multi-Head Attention
-        args.attn_args.kv_groups = 1 ==> MQA: Multi-Query Attention
-        args.attn_args.kv_groups = 2 ==> GQA: Group-Query Attention
+        args.attn_args.num_kv_groups = 1 ==> MQA: Multi-Query Attention
+        args.attn_args.num_kv_groups = 2 ==> GQA: Group-Query Attention
     '''
     def __init__(self, **kwargs):
         args = nn.Object(**kwargs)
@@ -29,7 +29,6 @@ def AttentionBlock(**kwargs):
         dropout = getattr(args, 'dropout', 0.2)
 
         # -- Attention Args
-        self.xproj = getattr(args, 'xproj', True)
         self.k_dim = getattr(args, 'k_dim', args.latent_dim)
         self.hidden_dim = getattr(args, 'hidden_dim', args.latent_dim)
         self.num_heads = getattr(args, 'num_heads', 1)
@@ -39,6 +38,7 @@ def AttentionBlock(**kwargs):
         assert self.k_dim % self.num_heads == 0
         assert self.num_heads % self.num_kv_groups == 0
         assert self.hidden_dim % self.num_heads == 0
+        self.xproj = getattr(args, 'xproj', True)
         if getattr(args, 'xproj', True):
             from Xproj import XprojBlock
             self.xproj = XprojBlock(**dict(kwargs, kv_dims=[self.k_dim, self.group_k_dim, self.group_v_dim]))
