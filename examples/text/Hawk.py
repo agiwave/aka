@@ -89,10 +89,11 @@ if __name__ == "__main__":
     )
     att_args = dict(
         num_heads = 8,
+        rot_embedding = True,
         mixers = [
             dict(
                 name = 'Conv1d'
-            ),
+            )
         ]
     )
     mlp_args = dict(

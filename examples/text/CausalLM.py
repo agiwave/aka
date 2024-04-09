@@ -6,14 +6,19 @@ def MetaLayer(**kwargs):
     '''
     Build resident meta layer by name. Include: GQA(Group-Query Attention), MLP, GateMLP, ...
     '''
-    def __init__(self, name, **kwargs):
-        import importlib
-        module = importlib.import_module(name)
-        short_name = name.split('./\\')[-1]
-        m = getattr(module, short_name+"Block", None)
-        assert m is not None, f"Unknown layer:{name}"
+    def __init__(self, **kwargs):
+        layer = kwargs.get('layer', None)
+        if layer is None:
+            name = kwargs['name']
+            import importlib
+            module = importlib.import_module(name)
+            short_name = name.split('./\\')[-1]
+            m = getattr(module, short_name+"Block", None)
+            assert m is not None, f"Unknown layer:{name}"
+            self.layer = m(**kwargs)
+        else:
+            self.layer = layer
         self.norm = nn.RMSNorm(kwargs['latent_dim'])
-        self.layer = m(**kwargs)
         self.x_gate = None if not kwargs.get('x_gate',False) else nn.Parameter(np.ones(kwargs['latent_dim']))
         self.resident_gate = None if not kwargs.get('resident_gate',False) else nn.Parameter(np.ones(kwargs['latent_dim']))
         return self
@@ -47,7 +52,6 @@ def CausalLM(**kwargs):
         self.tokenizer = args.tokenizer
         self.latent_dim = args.latent_dim
         self.vocab_dim = getattr(args, 'vocab_dim', args.latent_dim)
-        self.train_mode = getattr(args, 'train_mode', None)
         self.vocab_mode = getattr(args, 'vocab_mode', None)
         if self.vocab_dim != self.latent_dim:
             match self.vocab_mode:
@@ -58,10 +62,6 @@ def CausalLM(**kwargs):
                     self.out_proj = nn.Linear(self.latent_dim, self.vocab_dim, bias=args.bias)
 
         self.embedding = nn.Embedding(num_embeddings=args.vocab_size, embedding_dim=self.vocab_dim)
-
-        make_layer = MetaLayer if not hasattr(args, 'MetaLayer') else args.MetaLayer
-        self.layers = nn.ModuleList([make_layer(**dict(kwargs, **layer)) for layer in args.layers])
-        self.lm_head = None if not getattr(args, 'lm_head', False) else nn.Linear(self.vocab_dim, args.vocab_size,bias=False)
         match getattr(args, 'prev_norm', None):
             case 'rms':
                 self.prev_norm = nn.RMSNorm(args.latent_dim)
@@ -69,7 +69,10 @@ def CausalLM(**kwargs):
                 self.prev_norm = ScaleDk()
             case _:
                 self.prev_norm = None
+        self.layers = nn.ModuleList([MetaLayer(**dict(kwargs, **layer)) for layer in args.layers])
+        self.lm_head = None if not getattr(args, 'lm_head', False) else nn.Linear(self.vocab_dim, args.vocab_size,bias=False)
         self.post_norm = nn.RMSNorm(self.vocab_dim)
+        self.train_mode = getattr(args, 'train_mode', None)
         self.cache = {}
         return self
 
@@ -100,9 +103,9 @@ def CausalLM(**kwargs):
                 state['layer_states'] = layer_states
 
         layer_losses = []
-        for i in range(len(self.layers)):
+        for i, layer in enumerate(self.layers):
             l_state = None if state is None else layer_states[i]
-            x, loss = self.layers[i](x, cache=self.cache, state=l_state)
+            x, loss = layer(x, cache=self.cache, state=l_state)
             if loss is not None:
                 layer_losses.append(loss)
 

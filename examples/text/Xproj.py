@@ -141,6 +141,7 @@ if __name__ == "__main__":
             vocab_dim = 64,
             latent_dim = 512,
             resident_gate = True,
+            prev_norm = 'rms',
             dropout = 0.1,
             bias = False # bias in Linear?
         )
