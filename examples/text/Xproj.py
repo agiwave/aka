@@ -19,6 +19,7 @@ def XprojBlock(**kwargs):
 
         self.hidden_dim = getattr(args, 'hidden_dim', args.latent_dim)
         self.xproj_heads = getattr(args, 'xproj_heads', 1)
+        self.xproj_swapd = getattr(args, 'xproj_swapd', True)
         self.kv_dims = getattr(args, 'kv_dims', [self.hidden_dim])
         match getattr(args, 'gate', None):
             case 'gh':
@@ -111,8 +112,12 @@ def XprojBlock(**kwargs):
             x = x if self.act is None else self.act(x)
         else:
             x = self.act(hg) * x
-        x = x.view(b, l, -1, self.xproj_heads)    # mix heads
-        x = np.einsum('b l v h , h d v -> b l h d', x, self.out_proj)
+        if self.xproj_swapd:
+            x = x.view(b, l, -1, self.xproj_heads)    # mix heads
+            x = np.einsum('b l v h , h d v -> b l h d', x, self.out_proj)
+        else:
+            x = x.view(b, l, self.xproj_heads, -1)
+            x = np.einsum('b l h v , h d v -> b l h d', x, self.out_proj)
         x = np.reshape(x, shape)
         return x if self.og_dim == 0 else self.act(og) * x
 
