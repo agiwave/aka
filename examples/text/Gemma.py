@@ -1,13 +1,6 @@
 import aka.nn as nn
 import aka.numpy as np
 
-def GemmaEmbNorm():
-    def forward(self, x):
-        return x * (x.size(-1)**0.5)
-    return nn.Module(
-        forward = forward
-    )
-
 def GemmaArgs(name, tokenizer='data/Gemma/tokenizer.model'):
     class Tokenizer:
         def __init__(self, path):
@@ -37,7 +30,7 @@ def GemmaArgs(name, tokenizer='data/Gemma/tokenizer.model'):
         tokenizer = Tokenizer(tokenizer),
         vocab_size = 256000,
         latent_dim = 2048,
-        prev_norm = 'gemma',
+        prev_norm = 'scaledk',
         layers = [attn_args, mlp_args]*18,
         dropout = 0.0,
         bias = False, # bias in Linear?

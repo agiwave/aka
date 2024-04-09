@@ -120,7 +120,6 @@ def SSMArgs(name):
         case 'Gemma':
             return dict(
                 args,
-                prev_norm = 'gemma',
                 layers = [
                     dict(
                         name = 'Attention',

@@ -31,6 +31,13 @@ def MetaLayer(**kwargs):
         return x + y, None
     return __init__(nn.Module(forward = forward), **kwargs)
 
+def ScaleDk():
+    def forward(self, x):
+        return x * (x.size(-1)**0.5)
+    return nn.Module(
+        forward = forward
+    )
+
 def CausalLM(**kwargs):
     '''
     Causal Language Model.
@@ -50,22 +57,18 @@ def CausalLM(**kwargs):
                     self.in_proj = nn.Linear(self.vocab_dim, self.latent_dim, bias=args.bias)
                     self.out_proj = nn.Linear(self.latent_dim, self.vocab_dim, bias=args.bias)
 
-        self.embedding_scale = (None if not getattr(args,'embedding_scale',False) else math.sqrt(self.vocab_dim))
         self.embedding = nn.Embedding(num_embeddings=args.vocab_size, embedding_dim=self.vocab_dim)
 
         make_layer = MetaLayer if not hasattr(args, 'MetaLayer') else args.MetaLayer
         self.layers = nn.ModuleList([make_layer(**dict(kwargs, **layer)) for layer in args.layers])
         self.lm_head = None if not getattr(args, 'lm_head', False) else nn.Linear(self.vocab_dim, args.vocab_size,bias=False)
-
-        prev_norm = getattr(args, 'prev_norm', None)
-        if prev_norm is not None:
-            match prev_norm:
-                case 'gemma':
-                    from Gemma import GemmaEmbNorm
-                    prev_norm = GemmaEmbNorm()
-                case _:
-                    prev_norm = nn.RMSNorm(args.latent_dim)
-        self.prev_norm = prev_norm
+        match getattr(args, 'prev_norm', None):
+            case 'rms':
+                self.prev_norm = nn.RMSNorm(args.latent_dim)
+            case 'scaledk':
+                self.prev_norm = ScaleDk()
+            case _:
+                self.prev_norm = None
         self.post_norm = nn.RMSNorm(self.vocab_dim)
         self.cache = {}
         return self
@@ -86,12 +89,10 @@ def CausalLM(**kwargs):
                 case _:
                     x = self.in_proj(x)
 
-        if self.embedding_scale is not None:    # RetNet, nonsense :(. 
-            x = x * self.embedding_scale
-
         # -- layers --
         if self.prev_norm is not None:
             x = self.prev_norm(x)
+            
         if(state is not None):
             layer_states = state.get('layer_states', None)
             if layer_states is None:
@@ -156,7 +157,7 @@ def CausalLM(**kwargs):
 
                 word = self.tokenizer.decode(cache)
                 word_token_ids = self.tokenizer.encode(word)
-                if cache[-1] == word_token_ids[-1]:
+                if len(word_token_ids)>0 and cache[-1] == word_token_ids[-1]:
                     cache = []
                     yield word
 

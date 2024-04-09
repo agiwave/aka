@@ -128,7 +128,6 @@ def RetNet(name):
     args = dict(
         tokenizer = tokenizer,
         vocab_size = cfg['vocab_size'],
-        embedding_scale = True,
         latent_dim = cfg['decoder_embed_dim'],
         lm_head = True,
         prev_norm = 'rms',
