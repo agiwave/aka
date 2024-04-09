@@ -76,7 +76,7 @@ def train(
                 # -- Persist --
                 if(persist_filename!=None):
                     save_weights(model, persist_filename)
-                print('')
+                # print('')
             
             # -- Print batch result if passed time over 0.2s --
             curr_time = time.time()
