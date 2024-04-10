@@ -90,7 +90,7 @@ def XprojBlock(**kwargs):
         splits = xprojs.split([dim//self.xproj_heads for dim in split_dims], dim=-1)
         splits = [np.rearrange('b l h d->b l (h d)', item) for item in splits]
         (x, hg, og) = splits[-3], splits[-2], splits[-1]
-        k = splits[:-3]
+        kv = splits[:-3]
 
         # mixers
         if self.mixers is not None:
