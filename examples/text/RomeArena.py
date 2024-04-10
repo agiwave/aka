@@ -130,6 +130,7 @@ def RunRoles(roles, prompt, *, tokenizer='data/RomeArena', save_dir='data/RomeAr
             ))
         else:
             players.append(dict(
+                name = role['name'],
                 args = dict(
                     role,
                     tokenizer = tokenizer,
