@@ -143,13 +143,19 @@ def Trainer(
     optimizer="Adam",
     optimizer_kwargs={},
     loss_metric = None,
+    data_parallel = False,
     forward_kwargs={},
     epochs=2,
     dtype=None,
     **kwargs):
 
-    device = torch.device("cpu") if not torch.cuda.is_available() else torch.device("cuda:0")
-    model = model.to(device)
+    if data_parallel is True:
+        device = torch.device("cpu")
+        mode = torch.nn.DataParallel(model)
+    else:
+        device = torch.device("cpu") if not torch.cuda.is_available() else torch.device("cuda:0")
+        model = model.to(device)
+
     if dtype is not None:
         model = model.to(dtype)
 
