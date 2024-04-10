@@ -67,7 +67,7 @@ def HawkBlock(**kwargs):
 
         if state is not None:
             state['gru_state'] = x[:,-1:].detach()
-        x = x.view(b,l,-1)
+        x = np.rearrange('b l h d->b l (h d)',x)
 
         # Gate and Output
         if self.xproj is not None:
