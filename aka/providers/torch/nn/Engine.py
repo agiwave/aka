@@ -202,7 +202,7 @@ def Trainer(
                     ctx.train_mode = 3
                     ctx.tran_n_losses = len(loss)
                     ctx.train_losses, a_losses, t_optimizers = [], [], []
-                    for (m, _) in losses:
+                    for (m, _) in loss:
                         if(m is None):
                             m = model
                         optim = getattr(torch.optim,optimizer)(m.parameters(), **optimizer_kwargs)
@@ -229,7 +229,7 @@ def Trainer(
                 for (_, subloss) in loss:
                     optim = t_optimizers[i]
                     optim.zero_grad()
-                    retain_graph = True if i != n_losses-1 else False
+                    retain_graph = True if i != len(loss)-1 else False
                     subloss.backward(retain_graph=retain_graph)
                     ctx.losses.append(subloss.item())
                     i+=1
