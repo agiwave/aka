@@ -26,12 +26,12 @@ def HawkBlock(**kwargs):
         self.delta = nn.Parameter(np.array(0.5))
         return self
 
-    def forward(self, x, k=None, state=None, **kwargs):
+    def forward(self, x, kv=None, state=None, **kwargs):
         (b, l, d) = x.shape
         if self.xproj is not None:
             ((rg, ig), x, go) = self.xproj.proj_in(x, state=state)
         else:
-            (rg, ig) = k
+            (rg, ig) = kv
 
         # -- RG_LRU or GRU --
         rg = rg.unsqueeze(-1)
@@ -39,8 +39,8 @@ def HawkBlock(**kwargs):
         rg = np.sigmoid(rg)
         rg = ((self.c * np.softplus(self.delta)) * rg)  # [B,L,H]
 
-        x = np.rearrange('b l (h d)->b l h d', x, h=self.num_heads) # [B,L,H,D]
-        x = (1-np.exp(rg)) * np.sigmoid(ig) * x # The orginal paper: np.sqrt(1-rg**2)*np.sigmoid(ig).unsqueeze(-1) * x
+        x = x.view(b, l, self.num_heads, -1) # np.rearrange('b l (h d)->b l h d', x, h=self.num_heads) # [B,L,H,D]
+        (x, ig) = (1-np.exp(rg)) * np.sigmoid(ig) * x, None # The orginal paper: np.sqrt(1-rg**2)*np.sigmoid(ig).unsqueeze(-1) * x
         gru_state = None if state is None else state.get('gru_state',None)
         gru_state = gru_state if gru_state is not None else np.zeros(b, 1, self.num_heads, self.hidden_dim//self.num_heads, dtype=x.dtype, device=x.device)
 
@@ -55,7 +55,7 @@ def HawkBlock(**kwargs):
                 cumA = truncA.unsqueeze(2) * maskA                   #[b,l,1,h,d]
                 cumA = np.exp(np.cumsum(cumA, dim=1)) * maskA        #[b,l,m,h,d]
                 shiftB = np.cat([gru_state, truncX[:,:end-begin-1]], dim=1)
-                x[:,begin:end] = np.einsum('blmhd,bmhd->blhd', cumA, shiftB) + truncX
+                (x[:,begin:end], cumA) = (np.einsum('blmhd,bmhd->blhd', cumA, shiftB) + truncX, None)
                 gru_state = x[:,end-1:end]
                 begin = end
         elif False: # Approximate version and faster. May cause gradient vanishing
@@ -67,7 +67,7 @@ def HawkBlock(**kwargs):
 
         if state is not None:
             state['gru_state'] = x[:,-1:].detach()
-        x = np.rearrange('b l h d->b l (h d)',x)
+        x = x.view(b,l,-1)
 
         # Gate and Output
         if self.xproj is not None:
@@ -78,7 +78,7 @@ def HawkBlock(**kwargs):
 
 if __name__ == "__main__":
     args = dict(
-        vocab_dim = 32,
+        vocab_dim = 64,
         latent_dim = 384,
         xproj_heads = 4,
         resident_gate = True,
@@ -142,5 +142,5 @@ if __name__ == "__main__":
 
     from RomeArena import TrainRoles, RunRoles, PlotRoles
     # PlotRoles(roles, np.load('examples/text/hawk-losses.ckt'))
-    TrainRoles(roles, lr = 6e-3, epochs=1, show=True, show_frequency=2)
+    l = TrainRoles(roles, lr = 6e-3, epochs=1, show=True, show_frequency=2)
     # RunRoles(roles, 'My lord Sebastian')

@@ -31,12 +31,12 @@ def SSMBlock(**kwargs):
         self.delta = nn.Parameter(np.arange(1, 1 + self.num_heads, dtype=np.float))
         return self
 
-    def forward(self, x, k=None, state=None,  **kwargs):
+    def forward(self, x, kv=None, state=None,  **kwargs):
         (b, l, d) = x.shape
         if self.xproj is not None:
             ((C, A, B, gv), v, go) = self.xproj.proj_in(x, state=state)
         else:
-            (C, A, B, gv) = k
+            (C, A, B, gv) = kv
 
         # -- Prepare State --
         ssm_state = None if state is None else state.get('ssm_state',None)

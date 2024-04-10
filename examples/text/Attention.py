@@ -81,14 +81,14 @@ def AttentionBlock(**kwargs):
             mask = np.triu(mask, diagonal=shift - window_size + 1)
         return np.log(mask)
 
-    def forward(self, x, *, k=None, cache={}, state=None, **kwargs):
+    def forward(self, x, *, kv=None, cache={}, state=None, **kwargs):
         B, L, _ = x.size()
 
         # -- qkv --
         if self.xproj is not None:
             ((q, k), v, go) = self.xproj.proj_in(x, state=state)
         else:
-            ((q, k), v) = (k, x)
+            ((q, k), v) = (kv, x)
 
         num_heads, num_kv_groups = self.num_heads, self.num_kv_groups
         q = q.view(B, L, num_heads, -1)

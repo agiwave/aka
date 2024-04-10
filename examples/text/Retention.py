@@ -55,11 +55,11 @@ def RetentionBlock(**kwargs):
         y = np.stack((-x2, x1), dim=-1).flatten(-2)
         return (x * cos[pos:pos+L]) + (y * sin[pos:pos+L])
 
-    def forward(self, x, k=None, cache={}, state=None, **kwargs): 
+    def forward(self, x, kv=None, cache={}, state=None, **kwargs): 
         if self.xproj is not None:
             ((q, k), v, go) = self.xproj.proj_in(x, state=state)
         else:
-            ((q, k), v) = (k, x)
+            ((q, k), v) = (kv, x)
 
         B, T, H = x.size()
         # q, k, v, g = [proj(x) for proj in [self.q_proj, self.k_proj, self.v_proj, self.g_proj]]

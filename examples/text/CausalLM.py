@@ -24,24 +24,16 @@ def MetaLayer(**kwargs):
         return self
 
     def forward(self, x, **kwargs):
-        y = self.norm(x)
-        if self.x_gate is not None:
-            x_gate = np.gelu(self.x_gate)
-            y = self.layer(y, **kwargs)
-            y = y * x_gate
-        else:
-            y = self.layer(y, **kwargs)
-        if self.resident_gate is not None:
-            x = x * np.gelu(self.resident_gate)
+        y = self.layer(self.norm(x), **kwargs)
+        y = y if self.x_gate is None else y * np.gelu(self.x_gate)
+        x = x if self.resident_gate is None else x * np.gelu(self.resident_gate)
         return x + y, None
     return __init__(nn.Module(forward = forward), **kwargs)
 
 def ScaleDk():
     def forward(self, x):
         return x * (x.size(-1)**0.5)
-    return nn.Module(
-        forward = forward
-    )
+    return nn.Module(forward = forward)
 
 def CausalLM(**kwargs):
     '''

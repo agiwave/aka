@@ -100,7 +100,7 @@ def XprojBlock(**kwargs):
                     mixer_states = [{} for _ in self.mixers]
                     state['mixer_state'] = mixer_states
             for i, mixer in enumerate(self.mixers):
-                x = mixer(x, k=k, state=None if state is None else mixer_states[i])
+                x = mixer(x, kv=kv, state=None if state is None else mixer_states[i])
                 
         return (k, x, (hg, og, (b,l,d)))
 
@@ -109,9 +109,9 @@ def XprojBlock(**kwargs):
         (b, l, _) = shape
         x = x if self.dropout is None else self.dropout(x)
         if self.hg_dim == 0:
-            x = x if self.act is None else self.act(x)
+            x = x if self.act is None else self.act(x, inplace=True)
         else:
-            x = self.act(hg) * x
+            x = self.act(hg, inplace=True) * x
         if self.xproj_swapd:
             x = x.view(b, l, -1, self.xproj_heads)    # mix heads
             x = np.einsum('b l v h , h d v -> b l h d', x, self.out_proj)
@@ -119,7 +119,7 @@ def XprojBlock(**kwargs):
             x = x.view(b, l, self.xproj_heads, -1)
             x = np.einsum('b l h v , h d v -> b l h d', x, self.out_proj)
         x = np.reshape(x, shape)
-        return x if self.og_dim == 0 else self.act(og) * x
+        return x if self.og_dim == 0 else self.act(og, inplace=True) * x
 
     def forward(self, x, state=None, **kwargs):
         (_, x, g) = self.proj_in(x)
