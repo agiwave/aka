@@ -7,7 +7,7 @@ import aka.nn as nn
 import aka.repo as repo
 import aka.data
 
-def TrainRoles(roles, *, dataset=None, tokenizer='data/RomeArena', save_dir="data/RomeArena", block_size=512, batch_size=6, lr=1.e-4, dtype=None, show=False, **kwargs):
+def TrainRoles(roles, *, dataset=None, tokenizer='data/pretrain', save_dir="data/RomeArena", block_size=512, batch_size=6, lr=1.e-4, dtype=None, show=False, **kwargs):
     # -- dataset --
     if dataset is None:
         dataset = repo.AutoDataset(path='text', data_dir='data/pretrain', split='train')
