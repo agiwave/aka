@@ -102,7 +102,7 @@ def XprojBlock(**kwargs):
             for i, mixer in enumerate(self.mixers):
                 x = mixer(x, kv=kv, state=None if state is None else mixer_states[i])
                 
-        return (k, x, (hg, og, (b,l,d)))
+        return (kv, x, (hg, og, (b,l,d)))
 
     def proj_out(self, x, g, **kwargs):
         (hg, og, shape) = g
