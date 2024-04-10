@@ -109,9 +109,9 @@ def XprojBlock(**kwargs):
         (b, l, _) = shape
         x = x if self.dropout is None else self.dropout(x)
         if self.hg_dim == 0:
-            x = x if self.act is None else self.act(x, inplace=True)
+            x = x if self.act is None else self.act(x)
         else:
-            x = self.act(hg, inplace=True) * x
+            x = self.act(hg) * x
         if self.xproj_swapd:
             x = x.view(b, l, -1, self.xproj_heads)    # mix heads
             x = np.einsum('b l v h , h d v -> b l h d', x, self.out_proj)
@@ -119,7 +119,7 @@ def XprojBlock(**kwargs):
             x = x.view(b, l, self.xproj_heads, -1)
             x = np.einsum('b l h v , h d v -> b l h d', x, self.out_proj)
         x = np.reshape(x, shape)
-        return x if self.og_dim == 0 else self.act(og, inplace=True) * x
+        return x if self.og_dim == 0 else self.act(og) * x
 
     def forward(self, x, state=None, **kwargs):
         (_, x, g) = self.proj_in(x)
