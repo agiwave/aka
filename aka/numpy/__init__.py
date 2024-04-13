@@ -123,6 +123,9 @@ def roll(input, shifts, dims=None): return boot.invoke()
 def pad(input, pad, mode='constant', value=None): return boot.invoke()
 def vmap(func, in_dims=0, out_dims=0): return boot.invoke()
 
+# -- adv ext --
+def causalscan(z, a, b): return boot.invoke()
+    
 # -- dtype --
 int8, int16, int32, int64, short, int, long = None, None, None, None, None, None, None
 float, float16, float32, bfloat16 = None, None, None, None

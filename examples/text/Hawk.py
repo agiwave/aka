@@ -37,7 +37,7 @@ def HawkBlock(**kwargs):
         rg = rg.unsqueeze(-1)
         ig = ig.unsqueeze(-1)
         rg = np.sigmoid(rg)
-        rg = ((self.c * np.softplus(self.delta)) * rg)  # [B,L,H]
+        rg = ((self.c * np.softplus(self.delta)) * rg)  # [B,L,H,1]
 
         x = x.view(b, l, self.num_heads, -1) # np.rearrange('b l (h d)->b l h d', x, h=self.num_heads) # [B,L,H,D]
         (x, ig) = (1-np.exp(rg)) * np.sigmoid(ig) * x, None # The orginal paper: np.sqrt(1-rg**2)*np.sigmoid(ig).unsqueeze(-1) * x
@@ -45,7 +45,11 @@ def HawkBlock(**kwargs):
         gru_state = gru_state if gru_state is not None else np.zeros(b, 1, self.num_heads, self.hidden_dim//self.num_heads, dtype=x.dtype, device=x.device)
 
         # ---- RNN --->
-        if True: # Trunc-Wise Implementation, Walk around for L*L complexity.
+        if True:
+            x = np.causalscan(gru_state, np.exp(rg.contiguous()), x.contiguous())
+            gru_state = x[:,-1:]
+        else:
+            # Trunc-Wise Implementation, Walk around for L*L complexity.
             (begin, step) = (0, 128)
             mask = np.tril(np.ones(step, step, dtype=x.dtype, device=x.device))[:,:,None,None]   #[l,h,d]
             while begin < l:
@@ -58,11 +62,6 @@ def HawkBlock(**kwargs):
                 (x[:,begin:end], cumA) = (np.einsum('blmhd,bmhd->blhd', cumA, shiftB) + truncX, None)
                 gru_state = x[:,end-1:end]
                 begin = end
-        elif False: # Approximate version and faster. May cause gradient vanishing
-            cumA = np.exp(np.cumsum(rg, dim=1))
-            shiftA = np.pad(cumA, (0, 0, 0, 0, 1, -1), value=1.0)
-            shiftB = np.cat([gru_state, x[:,:l-1]], dim=1) / (1e-10+shiftA)
-            x = np.einsum('blhd,lm,bmhd->blhd', cumA, mask, shiftB) + x
         # <--- RNN ----
 
         if state is not None:
@@ -101,13 +100,13 @@ if __name__ == "__main__":
         hidden_dim = args['latent_dim']*3,
     )
     roles = [
-        dict( args, name = 'Hawk',
-            layers = [
-                dict(att_args, name='Hawk'), mlp_args] * 12
-        ),
+        # dict( args, name = 'Hawk',
+        #     layers = [
+        #         dict(att_args, name='Hawk'), mlp_args] * 12
+        # ),
         dict( args, name = 'HawkOnly',
             layers = [
-                dict(att_args, name='Hawk')] * 24
+                dict(att_args, name='Hawk', num_heads=384)] * 24
         ),
         dict( args, name = 'Griffin',
             layers = [
@@ -142,5 +141,5 @@ if __name__ == "__main__":
 
     from RomeArena import TrainRoles, RunRoles, PlotRoles
     # PlotRoles(roles, np.load('examples/text/hawk-losses.ckt'))
-    l = TrainRoles(roles, lr = 6e-3, epochs=1, show=True, show_frequency=2)
+    l = TrainRoles(roles, lr = 6e-3, epochs=1, batch_size=4, show=True, show_frequency=2)
     # RunRoles(roles, 'My lord Sebastian')
