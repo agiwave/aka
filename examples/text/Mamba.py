@@ -72,25 +72,37 @@ def MambaBlock(**kwargs):
         # y, ssm_state = ssm(y, delta, A, B, C, D, self.num_heads, ssm_state)  # This is similar to run_SSM(A, B, C, u) in The Annotated S4 [2]
         deltaA = np.einsum('blh,hn->blhn', delta, A).unsqueeze(-2)                # -> [B, L, h, d, n]
         y = np.rearrange('b l (h d)->b l h d', y, h=self.num_heads)
-        y_out = np.empty(y.shape, device=y.device)
 
-        # -- Trunc-Wise RNN --
-        (begin, step) = (0, 64)
-        mask = np.tril(np.ones(step, step, dtype=x.dtype, device=x.device))[:,:,None,None,None]   #[l,h,k,d]
-        while begin < l:
-            end = begin + step if l-begin>step else l
-            maskA = mask[:end-begin,:end-begin]
-            cumA = deltaA[:,begin:end].unsqueeze(2) * maskA      #[b,l,1,h,d,n]
-            cumA = np.exp(np.cumsum(cumA, dim=1)) * maskA        #[b,l,m,h,d,n]
-            deltaB = np.einsum('blh,bln,blhd->blhdn', delta[:,begin:end], B[:,begin:end], y[:,begin:end])
-            shiftB = np.cat([ssm_state, deltaB[:,begin:end-1]], dim=1)
-            S = np.einsum('blmhdn,bmhdn->blhdn', cumA, shiftB) + deltaB
-            y_out[:,begin:end] = np.einsum('blhdn,bln->blhd', S, C[:,begin:end])
+        if True:
+            deltaB = np.einsum('blh,bln,blhd->blhdn', delta, B, y)
+            deltaB = np.rearrange('b l h d n->b l h (d n)', deltaB) 
+            deltaA = np.rearrange('b l h d n->b l h (d n)', deltaA) 
+            ssm_state = np.rearrange('b l h d n->b l h (d n)', ssm_state) 
+            S = np.causalscan(ssm_state, np.exp(deltaA), deltaB)
+            S = np.rearrange('b l h (d n)->b l h d n', S, n=self.num_states) 
+            y = np.einsum('blhdn,bln->blhd', S, C)
             ssm_state = S[:,-1:]
-            begin = end
-        # -- RNN --
+        else:
+            # -- Trunc-Wise RNN --
+            y_out = np.empty(y.shape, device=y.device)
+            (begin, step) = (0, 64)
+            mask = np.tril(np.ones(step, step, dtype=x.dtype, device=x.device))[:,:,None,None,None]   #[l,h,k,d]
+            while begin < l:
+                end = begin + step if l-begin>step else l
+                maskA = mask[:end-begin,:end-begin]
+                cumA = deltaA[:,begin:end].unsqueeze(2) * maskA      #[b,l,1,h,d,n]
+                cumA = np.exp(np.cumsum(cumA, dim=1)) * maskA        #[b,l,m,h,d,n]
+                deltaB = np.einsum('blh,bln,blhd->blhdn', delta[:,begin:end], B[:,begin:end], y[:,begin:end])
+                shiftB = np.cat([ssm_state, deltaB[:,begin:end-1]], dim=1)
+                S = np.einsum('blmhdn,bmhdn->blhdn', cumA, shiftB) + deltaB
+                y_out[:,begin:end] = np.einsum('blhdn,bln->blhd', S, C[:,begin:end])
+                ssm_state = S[:,-1:]
+                begin = end
+            y = y_out
+            y_out = None
+            # -- RNN --
 
-        y = np.rearrange('b l h d-> b l (h d)', y_out, h=self.num_heads)
+        y = np.rearrange('b l h d-> b l (h d)', y, h=self.num_heads)
         y = y + D
 
         # -- Save State --

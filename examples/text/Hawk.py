@@ -46,7 +46,7 @@ def HawkBlock(**kwargs):
 
         # ---- RNN --->
         if True:
-            x = np.causalscan(gru_state, np.exp(rg.contiguous()), x.contiguous())
+            x = np.causalscan(gru_state, np.exp(rg), x)
             gru_state = x[:,-1:]
         else:
             # Trunc-Wise Implementation, Walk around for L*L complexity.
