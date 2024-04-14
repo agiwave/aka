@@ -29,19 +29,20 @@ class causal_scan(torch.autograd.Function):
     (Y, h(n))
     '''
     @staticmethod
-    def forward(ctx, H, A, B, X, C):
-        (H, A, B, X, C) = [item.contiguous() for item in [H, A, B, X, C]]
-        ZO = H.clone()
-        O = torch.zeros_like(X)
-        causal_scan_kernel.forward(ZO, A, B, X, C, O)
-        ctx.save_for_backward(H, A, B, X, C)
-        return O, ZO
+    def forward(ctx, X, H, A, B, C):
+        (X, H, A, B, C) = [item.contiguous() for item in [X, H, A, B, C]]
+        length = X.size(1)
+        group_size = 1023   # Must match the size in kernel.
+        H = torch.repeat_interleave(H, (length+group_size-1)//group_size+1, dim=1)
+        O = causal_scan_kernel.forward(X, H, A, B, C)
+        ctx.save_for_backward(X, H, A, B, C)
+        return O, H[:,-1:]
 
     @staticmethod
     def backward(ctx, gradO, gradZO):
-        H, A, B, X, C = ctx.saved_variables
-        gradH, gradA, gradB, gradX, gradC = causal_scan_kernel.backward(gradO, H, A, B, X, C)
-        return gradH, gradA, gradB, gradX, gradC
+        X, H, A, B, C = ctx.saved_variables
+        gradX, gradH, gradA, gradB, gradC = causal_scan_kernel.backward(gradO, X, H, A, B, C)
+        return gradX, gradH, gradA, gradB, gradC
 
 if __name__ == "__main__":
     device = torch.device("cuda")

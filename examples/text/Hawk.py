@@ -5,6 +5,7 @@ try:
     causalScan4d = causal_scan.apply
 except ImportError:
     causalScan4d = None
+    print('Warn: CausalScan4d import failured.')
 
 def HawkBlock(**kwargs):
     '''
@@ -39,13 +40,9 @@ def HawkBlock(**kwargs):
             (rg, ig) = kv
 
         # -- RG_LRU or GRU --
-        rg = rg.unsqueeze(-1)
-        ig = ig.unsqueeze(-1)
-        rg = np.sigmoid(rg)
-        rg = ((self.c * np.softplus(self.delta)) * rg)  # [B,L,H,1]
-
         x = x.view(b, l, self.num_heads, -1) # np.rearrange('b l (h d)->b l h d', x, h=self.num_heads) # [B,L,H,D]
-        (x, ig) = (1-np.exp(rg)) * np.sigmoid(ig) * x, None # The orginal paper: np.sqrt(1-rg**2)*np.sigmoid(ig).unsqueeze(-1) * x
+        rg = ((self.c * np.softplus(self.delta)) * np.sigmoid(rg).unsqueeze(-1))  # [B,L,H,1]
+        (x, ig) = (1-np.exp(rg)) * np.sigmoid(ig).unsqueeze(-1) * x, None # The orginal paper: np.sqrt(1-rg**2)*np.sigmoid(ig).unsqueeze(-1) * x
         gru_state = None if state is None else state.get('gru_state',None)
         gru_state = gru_state if gru_state is not None else np.zeros(b, 1, self.num_heads, self.hidden_dim//self.num_heads, dtype=x.dtype, device=x.device)
 
@@ -110,10 +107,10 @@ if __name__ == "__main__":
         #     layers = [
         #         dict(att_args, name='Hawk'), mlp_args] * 12
         # ),
-        dict( args, name = 'HawkOnly',
-            layers = [
-                dict(att_args, name='Hawk', num_heads=384)] * 24
-        ),
+        # dict( args, name = 'HawkOnly',
+        #     layers = [
+        #         dict(att_args, name='Hawk', num_heads=384)] * 24
+        # ),
         # dict( args, name = 'Griffin',
         #     layers = [
         #         dict(att_args, name='Hawk'), mlp_args,

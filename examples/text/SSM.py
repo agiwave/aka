@@ -1,5 +1,11 @@
 import aka.nn as nn
 import aka.numpy as np
+try:
+    from examples.text.CausalScan5d import causal_scan
+    causalScan5d = causal_scan.apply
+except ImportError:
+    causalScan5d = None
+    print('Warn: CausalScan5d import failured.')
 
 def SSMBlock(**kwargs):
     '''
@@ -34,7 +40,7 @@ def SSMBlock(**kwargs):
     def forward(self, x, kv=None, state=None,  **kwargs):
         (b, l, d) = x.shape
         if self.xproj is not None:
-            ((C, A, B, gv), v, go) = self.xproj.proj_in(x, state=state)
+            ((C, A, B, gv), x, go) = self.xproj.proj_in(x, state=state)
         else:
             (C, A, B, gv) = kv
 
@@ -58,27 +64,36 @@ def SSMBlock(**kwargs):
             case _:
                 assert False
         A = A.unsqueeze(-1)
-        v = np.rearrange('b l (h v)->b l h v', v, h=self.num_heads) * np.sigmoid(gv).unsqueeze(-1)
-        y = np.empty(v.shape, device=v.device)
+        x = np.rearrange('b l (h v)->b l h v', x, h=self.num_heads) * np.sigmoid(gv).unsqueeze(-1)
 
-        # -- RNN --
-        (begin, step) = (0, 64)
-        mask = np.tril(np.ones(step, step, dtype=x.dtype, device=x.device))[:,:,None,None,None]   #[l,h,k,d]
-        while begin < l:
-            end = begin + step if l-begin>step else l
-            trilMask = mask[:end-begin, :end-begin]
-            (truncA, truncB, truncC, truncV) = [item[:, begin:end] for item in [A,B,C,v]]
-            truncB = (1-np.exp(truncA)) * np.einsum('blhk,blhv->blhkv', truncB, truncV)
-            truncA = truncA.unsqueeze(2) * trilMask
-            truncA = np.exp(np.cumsum(truncA, dim=1)) * trilMask
-            shiftB = np.cat([ssm_state, truncB[:, :end-begin-1]], dim=1)
-            truncB = np.einsum('blmhkv,bmhkv->blhkv', truncA, shiftB) + truncB
-            y[:, begin:end] = np.einsum('blhk,blhkv->blhv', truncC, truncB)
-            ssm_state = truncB[:,-1:]
-            begin = end
-        # -- RNN --
+        if causalScan5d is not None:
+            x = x.unsqueeze(-1)
+            A = A.unsqueeze(-1)
+            B = B.unsqueeze(-2)
+            C = C.unsqueeze(-2)
+            x, ssm_state = causalScan5d(ssm_state, A, B, x, C)
+            x = x.squeeze(-1)
+        else:
+            # -- RNN --
+            y = np.empty(x.shape, device=x.device)
+            (begin, step) = (0, 64)
+            mask = np.tril(np.ones(step, step, dtype=x.dtype, device=x.device))[:,:,None,None,None]   #[l,h,k,d]
+            while begin < l:
+                end = begin + step if l-begin>step else l
+                trilMask = mask[:end-begin, :end-begin]
+                (truncA, truncB, truncC, truncV) = [item[:, begin:end] for item in [A,B,C,x]]
+                truncB = (1-np.exp(truncA)) * np.einsum('blhk,blhv->blhkv', truncB, truncV)
+                truncA = truncA.unsqueeze(2) * trilMask
+                truncA = np.exp(np.cumsum(truncA, dim=1)) * trilMask
+                shiftB = np.cat([ssm_state, truncB[:, :end-begin-1]], dim=1)
+                truncB = np.einsum('blmhkv,bmhkv->blhkv', truncA, shiftB) + truncB
+                y[:, begin:end] = np.einsum('blhk,blhkv->blhv', truncC, truncB)
+                ssm_state = truncB[:,-1:]
+                begin = end
+            x, y = y, None
+            # -- RNN --
 
-        x = np.rearrange('b l h d->b l (h d)', y)
+        x = np.rearrange('b l h d->b l (h d)', x)
         if state is not None:
             state['ssm_state'] = (t+l, ssm_state.detach())
 

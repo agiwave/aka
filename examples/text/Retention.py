@@ -68,7 +68,7 @@ def RetentionBlock(**kwargs):
             B = np.rearrange('b h l (d n)->b l h d n', B, d=1)
             x = np.rearrange('b h l (d n)->b l h d n', x, n=1)
             C = np.rearrange('b h l (d n)->b l h d n', C, d=1)
-            x, ssm_state = causalScan5d(ssm_state, A, B, x, C)
+            x, ssm_state = causalScan5d(x, ssm_state, A, B, C)
             x = x.view(b, l, self.num_heads, -1)
             if state is not None:
                 state['ssm_state'] = ssm_state.detach()
@@ -92,7 +92,7 @@ def RetentionBlock(**kwargs):
                 
             # -- qkv (Q @ K * D) @ V --
             decay_mask = compute_mask(self.decay, C.size(2), B.size(2))
-            x = np.einsum('bhld,bhmd,bhlm,bhmv->blhv', C, B, decay_mask, x)
+            y = np.einsum('bhld,bhmd,bhlm,bhmv->blhv', C, B, decay_mask, x)
 
             # -- state --
             if state is not None:
@@ -103,8 +103,9 @@ def RetentionBlock(**kwargs):
                     # S += S0 * (gamma ** n)
                     current_S += np.einsum('bhvd,bh->bhvd', prev_S, decay[:,:,-1])
                     # V += Q @ decay * S0
-                    x += np.einsum('bhld,bhvd,bhl->blhv', C, prev_S, decay)
+                    y += np.einsum('bhld,bhvd,bhl->blhv', C, prev_S, decay)
                 state["prev_S"] = current_S.detach()
+            x = y
 
         # Gate and Output
         x = self.group_norm(x).reshape(b, x.size(1), self.value_dim)
