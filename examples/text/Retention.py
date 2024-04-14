@@ -1,5 +1,11 @@
 import aka.nn as nn
 import aka.numpy as np
+try:
+    from examples.text.CausalScan5d import causal_scan
+    causalScan5d = causal_scan.apply
+except ImportError:
+    causalScan5d = None
+    print('Warn: CausalScan5d import failured.')
 
 def RetentionBlock(**kwargs):
     def __init__(self,**kwargs):
@@ -21,22 +27,6 @@ def RetentionBlock(**kwargs):
         )
         return self
 
-    def compute_mask(decay, qlen, klen, num_heads):
-        if qlen == 1:
-            return np.exp(decay)[None, :, None, None]
-        else:
-            index = np.arange(klen).to(decay)
-            mask = np.tril(np.ones(qlen, klen), diagonal=klen-qlen).to(decay)
-            mask = np.masked_fill(
-                index[-qlen:, None] - index[None, :], ~mask.bool(), float("inf")
-            )
-            mask = np.exp(mask * decay[:, None, None])
-            mask = np.nan_to_num(mask)
-            mask = mask.unsqueeze(0)  # [1, h, t, t]
-            mask = mask / mask.sum(dim=-1, keepdim=True).sqrt()
-            mask = np.nan_to_num(mask, nan=0.0)
-            return mask
-
     def apply_rotary_emb(x, cache, pos=0):
         _,_,L,D = x.shape
         slen = pos+L
@@ -57,42 +47,71 @@ def RetentionBlock(**kwargs):
 
     def forward(self, x, kv=None, cache={}, state=None, **kwargs): 
         if self.xproj is not None:
-            ((q, k), v, go) = self.xproj.proj_in(x, state=state)
+            ((C, B), x, go) = self.xproj.proj_in(x, state=state)
         else:
-            ((q, k), v) = (kv, x)
+            ((C, B), x) = (kv, x)
 
-        B, T, H = x.size()
+        b, l, _ = x.size()
         # q, k, v, g = [proj(x) for proj in [self.q_proj, self.k_proj, self.v_proj, self.g_proj]]
-        q, k, v = [t.view(B, T, self.num_heads, -1) for t in [q,k,v]]
-        k *= self.scaling
+        C, B, x = [t.view(b, l, self.num_heads, -1) for t in [C,B,x]]
+        B *= self.scaling
 
         # -- rotary embedding --
-        q, k, v = [np.rearrange('b l n d -> b n l d', t) for t in [q, k, v]]
-        q = apply_rotary_emb(q, cache)
-        k = apply_rotary_emb(k, cache)
+        C, B, x = [np.rearrange('b l n d -> b n l d', t) for t in [C, B, x]]
+        C = apply_rotary_emb(C, cache)
+        B = apply_rotary_emb(B, cache)
 
-        # -- qkv (Q @ K * D) @ V --
-        decay_mask = compute_mask(self.decay, q.size(2), k.size(2), self.num_heads)
-        y = np.einsum('bhld,bhmd,bhlm,bhmv->blhv', q, k, decay_mask, v)
+        if causalScan5d is not None:
+            ssm_state = None if state is None else state.get('ssm_state',None)
+            ssm_state = ssm_state if ssm_state is not None else np.zeros(b, 1, self.num_heads, self.embed_dim//self.num_heads, self.value_dim//self.num_heads, dtype=x.dtype, device=x.device)
+            A = np.exp(self.decay.view(1,1,self.num_heads,1,1))
+            B = np.rearrange('b h l (d n)->b l h d n', B, d=1)
+            x = np.rearrange('b h l (d n)->b l h d n', x, n=1)
+            C = np.rearrange('b h l (d n)->b l h d n', C, d=1)
+            x, ssm_state = causalScan5d(ssm_state, A, B, x, C)
+            x = x.view(b, l, self.num_heads, -1)
+            if state is not None:
+                state['ssm_state'] = ssm_state.detach()
+        else:
+            # Pure py implementation. Pool performance and Memory efficiency.
+            def compute_mask(decay, qlen, klen):
+                if qlen == 1:
+                    return np.exp(decay)[None, :, None, None]
+                else:
+                    index = np.arange(klen).to(decay)
+                    mask = np.tril(np.ones(qlen, klen), diagonal=klen-qlen).to(decay)
+                    mask = np.masked_fill(
+                        index[-qlen:, None] - index[None, :], ~mask.bool(), float("inf")
+                    )
+                    mask = np.exp(mask * decay[:, None, None])
+                    mask = np.nan_to_num(mask)
+                    mask = mask.unsqueeze(0)  # [1, h, t, t]
+                    mask = mask / mask.sum(dim=-1, keepdim=True).sqrt()
+                    mask = np.nan_to_num(mask, nan=0.0)
+                    return mask
+                
+            # -- qkv (Q @ K * D) @ V --
+            decay_mask = compute_mask(self.decay, C.size(2), B.size(2))
+            x = np.einsum('bhld,bhmd,bhlm,bhmv->blhv', C, B, decay_mask, x)
 
-        # -- state --
-        if state is not None:
-            current_S = np.einsum('bhld,bhlv,bhl->bhvd', k, v, decay_mask[:, :, -1])
-            prev_S = state.get('prev_S',None) # ->[b, h, d, v]
-            if prev_S is not None:
-                decay = decay_mask[:, :, :, 0] # ->[b, h, t]
-                # S += S0 * (gamma ** n)
-                current_S += np.einsum('bhvd,bh->bhvd', prev_S, decay[:,:,-1])
-                # V += Q @ decay * S0
-                y += np.einsum('bhld,bhvd,bhl->blhv', q, prev_S, decay)
-            state["prev_S"] = current_S.detach()
+            # -- state --
+            if state is not None:
+                current_S = np.einsum('bhld,bhlv,bhl->bhvd', B, x, decay_mask[:, :, -1])
+                prev_S = state.get('prev_S',None) # ->[b, h, d, v]
+                if prev_S is not None:
+                    decay = decay_mask[:, :, :, 0] # ->[b, h, t]
+                    # S += S0 * (gamma ** n)
+                    current_S += np.einsum('bhvd,bh->bhvd', prev_S, decay[:,:,-1])
+                    # V += Q @ decay * S0
+                    x += np.einsum('bhld,bhvd,bhl->blhv', C, prev_S, decay)
+                state["prev_S"] = current_S.detach()
 
         # Gate and Output
-        y = self.group_norm(y).reshape(B, y.size(1), self.value_dim)
+        x = self.group_norm(x).reshape(b, x.size(1), self.value_dim)
         if self.xproj is not None:
-            return self.xproj.proj_out(y, go)
+            return self.xproj.proj_out(x, go)
         else:
-            return y
+            return x
     return __init__(nn.Module(forward=forward), **kwargs)
 
 def RetentionArgs(name):

@@ -1,5 +1,11 @@
 import aka.nn as nn
 import aka.numpy as np
+try:
+    from examples.text.CausalScan5d import causal_scan
+    causalScan5d = causal_scan.apply
+except ImportError:
+    causalScan5d = None
+    print('Warn: CausalScan5d import failured.')
 
 def MambaBlock(**kwargs):
     """A single Mamba block, as described in Figure 3 in Section 3.4 in the Mamba paper [1]."""
@@ -69,21 +75,18 @@ def MambaBlock(**kwargs):
         x_dbl = self.x_proj(y)  # (b, l, dt_rank + 2*num_states)
         (delta, B, C) = x_dbl.split(split_size=[self.dt_rank, self.num_states, self.num_states], dim=-1)  # delta: (b, l, dt_rank). B, C: (b, l, n)
         delta = np.softplus(self.dt_proj(delta))  # (b, l, hidden_dim)
-        # y, ssm_state = ssm(y, delta, A, B, C, D, self.num_heads, ssm_state)  # This is similar to run_SSM(A, B, C, u) in The Annotated S4 [2]
-        deltaA = np.einsum('blh,hn->blhn', delta, A).unsqueeze(-2)                # -> [B, L, h, d, n]
         y = np.rearrange('b l (h d)->b l h d', y, h=self.num_heads)
 
-        if True:
-            deltaB = np.einsum('blh,bln,blhd->blhdn', delta, B, y)
-            deltaB = np.rearrange('b l h d n->b l h (d n)', deltaB) 
-            deltaA = np.rearrange('b l h d n->b l h (d n)', deltaA) 
-            ssm_state = np.rearrange('b l h d n->b l h (d n)', ssm_state) 
-            S = np.causalscan(ssm_state, np.exp(deltaA), deltaB)
-            S = np.rearrange('b l h (d n)->b l h d n', S, n=self.num_states) 
-            y = np.einsum('blhdn,bln->blhd', S, C)
-            ssm_state = S[:,-1:]
+        if causalScan5d is not None:
+            deltaA = np.exp(np.einsum('blh,hn->blhn', delta, A)).unsqueeze(-2)
+            deltaB = np.einsum('blh,bln->blhn', delta, B).unsqueeze(-2)
+            C = C.view(b, l, 1, 1, self.num_states)
+            y = y.unsqueeze(-1)
+            y, ssm_state = causalScan5d(ssm_state, deltaA, deltaB, y, C)
+            y = y.squeeze(-1)
         else:
             # -- Trunc-Wise RNN --
+            deltaA = np.einsum('blh,hn->blhn', delta, A).unsqueeze(-2)                # -> [B, L, h, d, n]
             y_out = np.empty(y.shape, device=y.device)
             (begin, step) = (0, 64)
             mask = np.tril(np.ones(step, step, dtype=x.dtype, device=x.device))[:,:,None,None,None]   #[l,h,k,d]

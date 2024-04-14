@@ -51,7 +51,3 @@ def rearrange(equation, *operands, **kwargs):
         return einops.rearrange(*operands, equation, **kwargs)
     else:
         return einops.rearrange(operands, equation, **kwargs)
-
-def causalscan(h0, a, b):
-    from .causal_scan import causal_scan
-    return causal_scan.apply(h0.contiguous(), a.contiguous(), b.contiguous())

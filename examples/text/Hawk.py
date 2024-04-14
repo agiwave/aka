@@ -1,5 +1,10 @@
 import aka.nn as nn
 import aka.numpy as np
+try:
+    from examples.text.CausalScan4d import causal_scan
+    causalScan4d = causal_scan.apply
+except ImportError:
+    causalScan4d = None
 
 def HawkBlock(**kwargs):
     '''
@@ -45,8 +50,8 @@ def HawkBlock(**kwargs):
         gru_state = gru_state if gru_state is not None else np.zeros(b, 1, self.num_heads, self.hidden_dim//self.num_heads, dtype=x.dtype, device=x.device)
 
         # ---- RNN --->
-        if True:
-            x = np.causalscan(gru_state, np.exp(rg), x)
+        if causalScan4d is not None:
+            x = causalScan4d(gru_state, np.exp(rg), x)
             gru_state = x[:,-1:]
         else:
             # Trunc-Wise Implementation, Walk around for L*L complexity.
@@ -88,6 +93,7 @@ if __name__ == "__main__":
     )
     att_args = dict(
         num_heads = 8,
+        num_states = 2,
         rot_embedding = True,
         mixers = [
             dict(
@@ -108,11 +114,11 @@ if __name__ == "__main__":
             layers = [
                 dict(att_args, name='Hawk', num_heads=384)] * 24
         ),
-        dict( args, name = 'Griffin',
-            layers = [
-                dict(att_args, name='Hawk'), mlp_args,
-                dict(att_args, name='Attention'), mlp_args,] * 6
-        ),
+        # dict( args, name = 'Griffin',
+        #     layers = [
+        #         dict(att_args, name='Hawk'), mlp_args,
+        #         dict(att_args, name='Attention'), mlp_args,] * 6
+        # ),
         dict( args, name = 'Mamba',
             layers = [
                 dict(att_args, name='Mamba')] * 24
