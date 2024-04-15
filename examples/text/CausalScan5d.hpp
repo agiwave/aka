@@ -160,7 +160,7 @@ torch::Tensor causalScan5d_cpu_Forward(
     torch::Tensor C
 ) {
     auto O = torch::zeros_like(X);
-    AT_DISPATCH_FLOATING_TYPES(O.type(), "causalScan5d_cpu_Forward", ([&] {
+    AT_DISPATCH_FLOATING_TYPES(O.scalar_type(), "causalScan5d_cpu_Forward", ([&] {
         wrap_t<scalar_t> shapeX = SHAPE5D(X);
         wrap_t<scalar_t> shapeZ = SHAPE5D(Z);
         wrap_t<scalar_t> shapeA = SHAPE5D(A);
@@ -204,7 +204,7 @@ std::vector<torch::Tensor> causalScan5d_cpu_Backward(
     auto gradA = torch::zeros_like(A);
     auto gradB = torch::zeros_like(B);
     auto gradC = torch::zeros_like(C);
-    AT_DISPATCH_FLOATING_TYPES(gradO.type(), "causalScan5d_cpu_Backward", ([&] {
+    AT_DISPATCH_FLOATING_TYPES(gradO.scalar_type(), "causalScan5d_cpu_Backward", ([&] {
         wrap_t<scalar_t> deltaX = SHAPE5D(gradX);
         wrap_t<scalar_t> deltaO = SHAPE5D(gradO);
         wrap_t<scalar_t> deltaZ = SHAPE5D(gradZ);

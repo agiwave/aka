@@ -99,7 +99,7 @@ torch::Tensor causalScan_cpu_Forward(torch::Tensor Z, torch::Tensor A, torch::Te
     shape_t shapeA = SHAPE4D(A);
     shape_t shapeO = SHAPE4D(B);
     shape_t shapeZ = SHAPE4D(Z);
-    AT_DISPATCH_FLOATING_TYPES(O.type(), "causalScan_Backward", ([&] {
+    AT_DISPATCH_FLOATING_TYPES(O.scalar_type(), "causalScan_Backward", ([&] {
         for(int ib=0; ib<shapeO.l; ib++)
         for(int ih=0; ih<shapeO.d; ih++){
             INDICS indics[] = {
@@ -124,7 +124,7 @@ std::vector<torch::Tensor> causalScan_cpu_Backward(torch::Tensor gradO, torch::T
     auto gradA = torch::zeros_like(A);
     auto gradX = torch::zeros_like(O);
     auto gradZ = torch::zeros_like(Z);
-    AT_DISPATCH_FLOATING_TYPES(O.type(), "causalScan_Backward", ([&] {
+    AT_DISPATCH_FLOATING_TYPES(O.scalar_type(), "causalScan_Backward", ([&] {
         shape_t shapeA = SHAPE4D(gradA);
         shape_t shapeO = SHAPE4D(gradO);
         shape_t shapeZ = SHAPE4D(gradZ);

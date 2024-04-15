@@ -92,7 +92,7 @@ torch::Tensor causalScan_cuda_Forward(torch::Tensor Z, torch::Tensor A, torch::T
         return causalScan_cpu_Forward(Z,A,B);
     }
     auto O = torch::zeros_like(B);
-    AT_DISPATCH_FLOATING_TYPES(O.type(), "causalScan_Forward", ([&] {
+    AT_DISPATCH_FLOATING_TYPES(O.scalar_type(), "causalScan_Forward", ([&] {
         shape_t shapeA = SHAPE4D(A);
         shape_t shapeO = SHAPE4D(B);
         shape_t shapeZ = SHAPE4D(Z);
@@ -117,7 +117,7 @@ std::vector<torch::Tensor> causalScan_cuda_Backward(torch::Tensor gradO, torch::
     auto gradA = torch::zeros_like(A);
     auto gradX = torch::zeros_like(O);
     auto gradZ = torch::zeros_like(Z);
-    AT_DISPATCH_FLOATING_TYPES(O.type(), "causalScan_Backward", ([&] {
+    AT_DISPATCH_FLOATING_TYPES(O.scalar_type(), "causalScan_Backward", ([&] {
         shape_t shapeA = SHAPE4D(gradA);
         shape_t shapeO = SHAPE4D(gradX);
         shape_t shapeZ = SHAPE4D(gradZ);
