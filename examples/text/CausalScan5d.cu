@@ -14,6 +14,9 @@ template <typename scalar_t> struct wrap_t{
 #endif//IDX5D
 
 #define atomAdd atomicAdd
+#ifndef GROUP_SIZE
+#define GROUP_SIZE 1023
+#endif//
 
 namespace { namespace device {
     template <typename scalar_t> __global__ void causalScan5d_Forward(
@@ -83,7 +86,6 @@ namespace { namespace device {
         scalar_t * pGradC = gradC.p + sc;
 
         scalar_t gradh = 0.0;
-        #define GROUP_SIZE 1023
         scalar_t zhs[GROUP_SIZE+1];
         int groups = (length + GROUP_SIZE - 1) / GROUP_SIZE;
         for(int igroups=groups-1; igroups>=0; igroups--){

@@ -20,6 +20,9 @@ typedef struct{
 #ifndef atomAdd
 #define atomAdd(p,b) (*(p) = *(p) + (b))
 #endif//atomAdd
+#ifndef GROUP_SIZE
+#define GROUP_SIZE 1023
+#endif//
 
 namespace { namespace device {
     template <typename scalar_t> void causalScan5d_cpu_Forward(
@@ -45,7 +48,7 @@ namespace { namespace device {
         while(i++<shapeO.l) {
             zh = (*pA) * zh + (*pB) * (*pX);
             atomAdd(pO, ((*pC) * zh));
-            if( i % 1024 == 0 ) {
+            if( i % GROUP_SIZE == 0 ) {
                 pH += shapeZ.s;
                 *pH = zh;
             }
@@ -93,7 +96,6 @@ namespace { namespace device {
         scalar_t * pGradC = gradC.p + sc;
 
         scalar_t gradh = 0.0;
-        #define GROUP_SIZE 1023
         scalar_t zhs[GROUP_SIZE+1];
         int groups = (length + GROUP_SIZE - 1) / GROUP_SIZE;
         for(int igroups=groups-1; igroups>=0; igroups--){

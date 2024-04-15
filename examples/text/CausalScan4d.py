@@ -29,19 +29,19 @@ class CausalScan4d(torch.autograd.Function):
     (Y, h(n))
     '''
     @staticmethod
-    def forward(ctx, X, H, A, B, C):
-        (X, H, A, B, C) = [item.contiguous() for item in [X, H, A, B, C]]
-        length = X.size(1)
+    def forward(ctx, x, h, A, B, C):
+        (x, h, A, B, C) = [item.contiguous() for item in [x, h, A, B, C]]
+        (_, l, _, _) = x.shape
         group_size = 1023   # Must match the size in kernel.
-        H = torch.repeat_interleave(H, (length+group_size-1)//group_size+1, dim=1)
-        O = causal_scan_kernel.forward(X, H, A, B, C)
-        ctx.save_for_backward(X, H, A, B, C)
-        return O, H[:,-1:]
+        h = torch.repeat_interleave(h, (l+group_size-1)//group_size+1, dim=1)
+        o = causal_scan_kernel.forward(x, h, A, B, C)
+        ctx.save_for_backward(x, h, A, B, C)
+        return o, h[:,-1:]
 
     @staticmethod
     def backward(ctx, gradO, gradZO):
-        X, H, A, B, C = ctx.saved_variables
-        gradX, gradH, gradA, gradB, gradC = causal_scan_kernel.backward(gradO, X, H, A, B, C)
+        x, h, A, B, C = ctx.saved_variables
+        gradX, gradH, gradA, gradB, gradC = causal_scan_kernel.backward(gradO, x, h, A, B, C)
         return gradX, gradH, gradA, gradB, gradC
 
 if __name__ == "__main__":
