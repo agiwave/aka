@@ -5,15 +5,15 @@ import os
 
 script_dir = os.path.dirname(__file__)
 if cuda.is_available():
-    causal_scan_kernel = ext.load('causal_scan_4d', [
-        os.path.join(script_dir, 'CausalScan4d.cu')
+    causal_scan_kernel = ext.load('CausalScan', [
+        os.path.join(script_dir, 'CausalScan.cu')
     ]) 
 else:
-    causal_scan_kernel = ext.load('causal_scan_4d', [
-        os.path.join(script_dir, 'CausalScan4d.hpp')
+    causal_scan_kernel = ext.load('CausalScan', [
+        os.path.join(script_dir, 'CausalScan.hpp')
     ]) 
 
-class causal_scan(torch.autograd.Function):
+class CausalScan(torch.autograd.Function):
     '''
     Formula:
     h(1) = a(1) * z + b(1)
@@ -23,15 +23,14 @@ class causal_scan(torch.autograd.Function):
     '''
     @staticmethod
     def forward(ctx, Z, A, B):
-        bz, lz, hz, dz = Z.shape
-        ba, la, ha, da = A.shape
-        bb, lb, hb, db = B.shape
-        assert lz == 1 and la == lb
+        bz, lz, dz = Z.shape
+        ba, la, da = A.shape
+        bb, lb, db = B.shape
+        assert lz == 1 and lb % la == 0
         assert bz == bb
         assert ba == 1 or ba == bb
-        assert hz == hb and dz == db
-        assert ha == hb
-        assert db % da == 0 
+        assert dz == db 
+        assert dz == db and db % da == 0
         O = causal_scan_kernel.forward(Z.contiguous(), A.contiguous(), B.contiguous())
         ctx.save_for_backward(Z, A, O)
         return O
@@ -47,4 +46,4 @@ if __name__ == "__main__":
     Z = torch.randn(5, 1, 3, 4, device=device)
     A = torch.randn(5, 2, 3, 1, device=device)
     B = torch.randn(5, 2, 3, 4, device=device)
-    print(causal_scan.apply(Z, A, B))
+    print(CausalScan.apply(Z, A, B))
