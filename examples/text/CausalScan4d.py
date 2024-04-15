@@ -5,15 +5,15 @@ import os
 
 script_dir = os.path.dirname(__file__)
 if cuda.is_available():
-    causal_scan_kernel = ext.load('causal_scan_5d', [
-        os.path.join(script_dir, 'CausalScan5d.cu')
+    causal_scan_kernel = ext.load('CausalScan4d', [
+        os.path.join(script_dir, 'CausalScan4d.cu')
     ]) 
 else:
-    causal_scan_kernel = ext.load('causal_scan_5d', [
-        os.path.join(script_dir, 'CausalScan5d.hpp')
+    causal_scan_kernel = ext.load('CausalScan4d', [
+        os.path.join(script_dir, 'CausalScan4d.hpp')
     ]) 
 
-class causal_scan(torch.autograd.Function):
+class CausalScan4d(torch.autograd.Function):
     '''
     Formula:
     h(1) = a(1) * z         + b(1) * x(1)

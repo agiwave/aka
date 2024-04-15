@@ -1,11 +1,11 @@
 import aka.nn as nn
 import aka.numpy as np
 try:
-    from examples.text.CausalScan5d import causal_scan
-    causalScan5d = causal_scan.apply
+    from examples.text.CausalScan4d import CausalScan4d
+    causalScan = CausalScan4d.apply
 except ImportError:
-    causalScan5d = None
-    print('Warn: CausalScan5d import failured.')
+    causalScan = None
+    print('Warn: CausalScanSSM import failured.')
 
 def MambaBlock(**kwargs):
     """A single Mamba block, as described in Figure 3 in Section 3.4 in the Mamba paper [1]."""
@@ -78,12 +78,12 @@ def MambaBlock(**kwargs):
         delta = np.softplus(self.dt_proj(delta))  # (b, l, hidden_dim)
         x = np.rearrange('b l (h d)->b l h d', x, h=self.num_heads)
 
-        if causalScan5d is not None:
+        if causalScan is not None:
             deltaA = np.exp(np.einsum('blh,hn->blhn', delta, A)).unsqueeze(-2)
             deltaB = np.einsum('blh,bln->blhn', delta, B).unsqueeze(-2)
             C = C.view(b, l, 1, 1, self.num_states)
             x = x.unsqueeze(-1)
-            x, ssm_state = causalScan5d(x, ssm_state, deltaA, deltaB, C)
+            x, ssm_state = causalScan(x, ssm_state, deltaA, deltaB, C)
             x = x.squeeze(-1)
         else:
             # -- Trunc-Wise RNN --

@@ -1,11 +1,11 @@
 import aka.nn as nn
 import aka.numpy as np
 try:
-    from examples.text.CausalScan5d import causal_scan
-    causalScan5d = causal_scan.apply
+    from examples.text.CausalScan4d import CausalScan4d
+    causalScan = CausalScan4d.apply
 except ImportError:
-    causalScan5d = None
-    print('Warn: CausalScan5d import failured.')
+    causalScan = None
+    print('Warn: CausalScan4d import failured.')
 
 def RetentionBlock(**kwargs):
     def __init__(self,**kwargs):

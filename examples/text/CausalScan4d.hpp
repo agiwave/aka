@@ -22,7 +22,7 @@ typedef struct{
 #endif//atomAdd
 
 namespace { namespace device {
-    template <typename scalar_t> void causalScan5d_cpu_Forward(
+    template <typename scalar_t> void causalScan4d_cpu_Forward(
         const wrap_t<scalar_t> shapeX,
         const wrap_t<scalar_t> shapeZ,
         const wrap_t<scalar_t> shapeA,
@@ -58,7 +58,7 @@ namespace { namespace device {
         pZ[(shapeZ.l-1)*shapeZ.s] = zh;
     }
 
-    template <typename scalar_t> void causalScan5d_cpu_Backward(
+    template <typename scalar_t> void causalScan4d_cpu_Backward(
         scalar_t * pX,
         scalar_t * pZ,
         scalar_t * pA,
@@ -150,7 +150,7 @@ namespace { namespace device {
     (scalar_t*)t.data_ptr()\
 }
 
-torch::Tensor causalScan5d_cpu_Forward(
+torch::Tensor causalScan4d_cpu_Forward(
     torch::Tensor X, 
     torch::Tensor Z, 
     torch::Tensor A,
@@ -158,7 +158,7 @@ torch::Tensor causalScan5d_cpu_Forward(
     torch::Tensor C
 ) {
     auto O = torch::zeros_like(X);
-    AT_DISPATCH_FLOATING_TYPES(O.type(), "causalScan5d_cpu_Forward", ([&] {
+    AT_DISPATCH_FLOATING_TYPES(O.type(), "causalScan4d_cpu_Forward", ([&] {
         wrap_t<scalar_t> shapeX = SHAPE5D(X);
         wrap_t<scalar_t> shapeZ = SHAPE5D(Z);
         wrap_t<scalar_t> shapeA = SHAPE5D(A);
@@ -174,7 +174,7 @@ torch::Tensor causalScan5d_cpu_Forward(
                 {ib, ih, id},
                 {in}
             };
-            device::causalScan5d_cpu_Forward<scalar_t>(
+            device::causalScan4d_cpu_Forward<scalar_t>(
                 shapeX,
                 shapeZ,
                 shapeA,
@@ -189,7 +189,7 @@ torch::Tensor causalScan5d_cpu_Forward(
     return O;
 }
 
-std::vector<torch::Tensor> causalScan5d_cpu_Backward(
+std::vector<torch::Tensor> causalScan4d_cpu_Backward(
     torch::Tensor gradO,
     torch::Tensor X, 
     torch::Tensor Z,
@@ -202,7 +202,7 @@ std::vector<torch::Tensor> causalScan5d_cpu_Backward(
     auto gradA = torch::zeros_like(A);
     auto gradB = torch::zeros_like(B);
     auto gradC = torch::zeros_like(C);
-    AT_DISPATCH_FLOATING_TYPES(gradO.type(), "causalScan5d_cpu_Backward", ([&] {
+    AT_DISPATCH_FLOATING_TYPES(gradO.type(), "causalScan4d_cpu_Backward", ([&] {
         wrap_t<scalar_t> deltaX = SHAPE5D(gradX);
         wrap_t<scalar_t> deltaO = SHAPE5D(gradO);
         wrap_t<scalar_t> deltaZ = SHAPE5D(gradZ);
@@ -218,7 +218,7 @@ std::vector<torch::Tensor> causalScan5d_cpu_Backward(
                 {ib, ih, id},
                 {in}
             };
-            device::causalScan5d_cpu_Backward<scalar_t>(
+            device::causalScan4d_cpu_Backward<scalar_t>(
                 (scalar_t*)X.data_ptr(),
                 (scalar_t*)Z.data_ptr(),
                 (scalar_t*)A.data_ptr(),
@@ -241,7 +241,7 @@ std::vector<torch::Tensor> causalScan5d_cpu_Backward(
 #ifndef __PYBINDED__
 #define __PYBINDED__
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-    m.def("forward", &causalScan5d_cpu_Forward, "");
-    m.def("backward", &causalScan5d_cpu_Backward, "");
+    m.def("forward", &causalScan4d_cpu_Forward, "");
+    m.def("backward", &causalScan4d_cpu_Backward, "");
 }
 #endif//__PYBINDED__

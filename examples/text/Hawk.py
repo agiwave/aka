@@ -109,10 +109,10 @@ if __name__ == "__main__":
         #     layers = [
         #         dict(att_args, name='Hawk'), mlp_args] * 12
         # ),
-        dict( args, name = 'HawkOnly',
-            layers = [
-                dict(att_args, name='Hawk', num_heads=192)] * 24
-        ),
+        # dict( args, name = 'HawkOnly',
+        #     layers = [
+        #         dict(att_args, name='Hawk', num_heads=192)] * 24
+        # ),
         # dict( args, name = 'Griffin',
         #     layers = [
         #         dict(att_args, name='Hawk'), mlp_args,
