@@ -49,12 +49,12 @@ def MambaBlock(**kwargs):
                 ssm_state = state['ssm_state']
             else:
                 conv_state = np.zeros(b, n_conv_state, self.hidden_dim, dtype=x.dtype, device=x.device)
-                ssm_state = np.zeros(b, 1, self.num_heads, self.hidden_dim//self.num_heads, self.num_states, dtype=x.dtype, device=x.device)
+                ssm_state = np.zeros(b, 1, self.hidden_dim, self.num_states, dtype=x.dtype, device=x.device)
             x = np.cat((conv_state, x), dim=1)
             conv_state = x[:, -n_conv_state:]
         else:
             n_conv_state = 0
-            ssm_state = np.zeros(b, 1, self.num_heads, self.hidden_dim//self.num_heads, self.num_states, dtype=x.dtype, device=x.device)
+            ssm_state = np.zeros(b, 1, self.hidden_dim, self.num_states, dtype=x.dtype, device=x.device)
 
         # -- Conv --
         x = np.einsum('bld->bdl',x)
@@ -76,17 +76,18 @@ def MambaBlock(**kwargs):
         x_dbl = self.x_proj(x)  # (b, l, dt_rank + 2*num_states)
         (delta, B, C) = x_dbl.split(split_size=[self.dt_rank, self.num_states, self.num_states], dim=-1)  # delta: (b, l, dt_rank). B, C: (b, l, n)
         delta = np.softplus(self.dt_proj(delta))  # (b, l, hidden_dim)
-        x = np.rearrange('b l (h d)->b l h d', x, h=self.num_heads)
 
         if causalScan is not None:
-            deltaA = np.exp(np.einsum('blh,hn->blhn', delta, A)).unsqueeze(-2)
-            deltaB = np.einsum('blh,bln->blhn', delta, B).unsqueeze(-2)
-            C = C.view(b, l, 1, 1, self.num_states)
+            deltaA = np.exp(np.einsum('blh,hn->blhn', delta, A))
+            deltaB = np.einsum('blh,bln->blhn', delta, B)
+            C = C.view(b, l, 1, self.num_states)
             x = x.unsqueeze(-1)
             x, ssm_state = causalScan(x, ssm_state, deltaA, deltaB, C)
             x = x.squeeze(-1)
         else:
             # -- Trunc-Wise RNN --
+            x = np.rearrange('b l (h d)->b l h d', x, h=self.num_heads)
+            ssm_state = np.rearrange('b l (h d) n->b l h d n', ssm_state, h=self.num_heads)
             deltaA = np.einsum('blh,hn->blhn', delta, A).unsqueeze(-2)                # -> [B, L, h, d, n]
             y_out = np.empty(x.shape, device=x.device)
             (begin, step) = (0, 64)
@@ -104,12 +105,12 @@ def MambaBlock(**kwargs):
                 begin = end
             x = y_out
             y_out = None
+            ssm_state = np.rearrange('b l h d n->b l (h d) n', ssm_state)
+            x = np.rearrange('b l h d-> b l (h d)', x, h=self.num_heads)
             # -- RNN --
 
-        x = np.rearrange('b l h d-> b l (h d)', x, h=self.num_heads)
-        x = x + D
-
         # -- Save State --
+        x = x + D
         if state is not None:
             state['ssm_state'] = ssm_state.detach()
             state['conv_state'] = conv_state.detach()

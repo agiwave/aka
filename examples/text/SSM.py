@@ -1,10 +1,10 @@
 import aka.nn as nn
 import aka.numpy as np
 try:
-    from examples.text.CausalScan4d import causal_scan
-    causalScan5d = causal_scan.apply
+    from examples.text.CausalScan5d import causal_scan
+    causalScan = causal_scan.apply
 except ImportError:
-    causalScan5d = None
+    causalScan = None
     print('Warn: CausalScan5d import failured.')
 
 def SSMBlock(**kwargs):
@@ -66,12 +66,12 @@ def SSMBlock(**kwargs):
         A = A.unsqueeze(-1)
         x = np.rearrange('b l (h v)->b l h v', x, h=self.num_heads) * np.sigmoid(gv).unsqueeze(-1)
 
-        if causalScan5d is not None:
+        if causalScan is not None:
             x = x.unsqueeze(-1)
             A = A.unsqueeze(-1)
             B = B.unsqueeze(-2)
             C = C.unsqueeze(-2)
-            x, ssm_state = causalScan5d(ssm_state, A, B, x, C)
+            x, ssm_state = causalScan(ssm_state, A, B, x, C)
             x = x.squeeze(-1)
         else:
             # -- RNN --

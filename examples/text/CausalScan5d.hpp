@@ -4,18 +4,17 @@
 #ifndef __wrap_t__
 #define __wrap_t__
 template <typename scalar_t> struct wrap_t{
-    int b, l, d, n;
-    int stepb, stepl;
+    int x, y, z, l, n, s;
     scalar_t* p;
 };
 #endif//__wrap_t__
 typedef struct{
-    int x, y;
+    int x, y, z;
 }INDICS;
 
 #ifndef IDX5D
-#define IDX5D(shape) ((blockIdx.x % shape.b) * shape.stepb + (blockIdx.y % shape.d) * shape.n + threadIdx.x % shape.n)
-#define Ptr5D(shape) (shape.p + IDX5D(shape))
+#define IDX5D(shape) ((((blockIdx.x % shape.x) * shape.l * shape.y + blockIdx.y % shape.y ) * shape.z + blockIdx.z % shape.z) * shape.n + threadIdx.x % shape.n)
+#define Ptr5D(shape) (shape.p + ((((blockIdx.x % shape.x) * shape.l * shape.y + blockIdx.y % shape.y ) * shape.z + blockIdx.z % shape.z) * shape.n + threadIdx.x % shape.n))
 #endif//IDX5D
 
 #ifndef atomAdd
@@ -23,7 +22,7 @@ typedef struct{
 #endif//atomAdd
 
 namespace { namespace device {
-    template <typename scalar_t> void causalScan4d_cpu_Forward(
+    template <typename scalar_t> void causalScan5d_cpu_Forward(
         const wrap_t<scalar_t> shapeX,
         const wrap_t<scalar_t> shapeZ,
         const wrap_t<scalar_t> shapeA,
@@ -47,19 +46,19 @@ namespace { namespace device {
             zh = (*pA) * zh + (*pB) * (*pX);
             atomAdd(pO, ((*pC) * zh));
             if( i % 1024 == 0 ) {
-                pH += shapeZ.stepl;
+                pH += shapeZ.s;
                 *pH = zh;
             }
-            pX += shapeX.stepl;
-            pA += shapeA.stepl;
-            pB += shapeB.stepl;
-            pC += shapeC.stepl;
-            pO += shapeO.stepl;
+            pX += shapeX.s;
+            pA += shapeA.s;
+            pB += shapeB.s;
+            pC += shapeC.s;
+            pO += shapeO.s;
         }
-        pZ[(shapeZ.l-1)*shapeZ.stepl] = zh;
+        pZ[(shapeZ.l-1)*shapeZ.s] = zh;
     }
 
-    template <typename scalar_t> void causalScan4d_cpu_Backward(
+    template <typename scalar_t> void causalScan5d_cpu_Backward(
         scalar_t * pX,
         scalar_t * pZ,
         scalar_t * pA,
@@ -86,7 +85,7 @@ namespace { namespace device {
         pA += sa;
         pB += sb;
         pC += sc;
-        scalar_t * pGradO = gradO.p + sx;
+        scalar_t * pGradO = Ptr5D(gradO);
         scalar_t * pGradX = gradX.p + sx;
         scalar_t * pGradZ = gradZ.p + sz;
         scalar_t * pGradA = gradA.p + sa;
@@ -101,34 +100,34 @@ namespace { namespace device {
             int ibegin = igroups * GROUP_SIZE;
             int group_length = (igroups==groups-1)?(length-ibegin):GROUP_SIZE;
 
-            scalar_t * pIX = pX + ibegin*gradX.stepl;
-            scalar_t * pIA = pA + ibegin*gradA.stepl;
-            scalar_t * pIB = pB + ibegin*gradB.stepl;
-            zhs[0] = pZ[igroups*gradZ.stepl];
+            scalar_t * pIX = pX + ibegin*gradX.s;
+            scalar_t * pIA = pA + ibegin*gradA.s;
+            scalar_t * pIB = pB + ibegin*gradB.s;
+            zhs[0] = pZ[igroups*gradZ.s];
             for(int i=0; i<group_length; i++) {
                 zhs[i+1] = (*pIA) * zhs[i] + (*pIB) * (*pIX);
-                pIX += gradX.stepl;
-                pIA += gradA.stepl;
-                pIB += gradB.stepl;
+                pIX += gradX.s;
+                pIA += gradA.s;
+                pIB += gradB.s;
             }
 
             int iend = ibegin + group_length;
-            scalar_t * pIC = pC + iend * gradC.stepl;
-            scalar_t * pIGradO = pGradO + iend * gradO.stepl;
-            scalar_t * pIGradX = pGradX + iend * gradX.stepl;
-            scalar_t * pIGradA = pGradA + iend * gradA.stepl;
-            scalar_t * pIGradB = pGradB + iend * gradB.stepl;
-            scalar_t * pIGradC = pGradC + iend * gradC.stepl;
+            scalar_t * pIC = pC + iend * gradC.s;
+            scalar_t * pIGradO = pGradO + iend * gradO.s;
+            scalar_t * pIGradX = pGradX + iend * gradX.s;
+            scalar_t * pIGradA = pGradA + iend * gradA.s;
+            scalar_t * pIGradB = pGradB + iend * gradB.s;
+            scalar_t * pIGradC = pGradC + iend * gradC.s;
             while(group_length-->0) {
-                pIX -= gradX.stepl;
-                pIA -= gradA.stepl;
-                pIB -= gradB.stepl;
-                pIC -= gradC.stepl;
-                pIGradO -= gradO.stepl;
-                pIGradX -= gradX.stepl;
-                pIGradA -= gradA.stepl;
-                pIGradB -= gradB.stepl;
-                pIGradC -= gradC.stepl;
+                pIX -= gradX.s;
+                pIA -= gradA.s;
+                pIB -= gradB.s;
+                pIC -= gradC.s;
+                pIGradO -= gradO.s;
+                pIGradX -= gradX.s;
+                pIGradA -= gradA.s;
+                pIGradB -= gradB.s;
+                pIGradC -= gradC.s;
 
                 atomAdd(pIGradC, (*pIGradO) * zhs[group_length+1]);
                 gradh += (*pIGradO) * (*pC);
@@ -144,13 +143,14 @@ namespace { namespace device {
 
 
 #define SHAPE5D(t) {\
-    (int)t.size(0), (int)t.size(1), (int)t.size(2), (int)t.size(3), \
-    (int)(t.size(1) * t.size(2) * t.size(3)),\
-    (t.size(1) == 1) ? 0 : (int)(t.size(2) * t.size(3)),\
+    (int)t.size(0), (int)t.size(2), (int)t.size(3),\
+    (int)t.size(1), \
+    (int)t.size(4), \
+    t.size(1) == 1 ? 0 : ((int)t.size(2) * (int)t.size(3) * (int)t.size(4)),\
     (scalar_t*)t.data_ptr()\
 }
 
-torch::Tensor causalScan4d_cpu_Forward(
+torch::Tensor causalScan5d_cpu_Forward(
     torch::Tensor X, 
     torch::Tensor Z, 
     torch::Tensor A,
@@ -158,22 +158,23 @@ torch::Tensor causalScan4d_cpu_Forward(
     torch::Tensor C
 ) {
     auto O = torch::zeros_like(X);
-    AT_DISPATCH_FLOATING_TYPES(O.type(), "causalScan4d_cpu_Forward", ([&] {
+    AT_DISPATCH_FLOATING_TYPES(O.type(), "causalScan5d_cpu_Forward", ([&] {
         wrap_t<scalar_t> shapeX = SHAPE5D(X);
         wrap_t<scalar_t> shapeZ = SHAPE5D(Z);
         wrap_t<scalar_t> shapeA = SHAPE5D(A);
         wrap_t<scalar_t> shapeB = SHAPE5D(B);
         wrap_t<scalar_t> shapeC = SHAPE5D(C);
         wrap_t<scalar_t> shapeO = SHAPE5D(O);
-        for(int ib=0; ib<shapeZ.b; ib++)
-        for(int ih=0; ih<shapeZ.d; ih++)
+        for(int ib=0; ib<shapeZ.x; ib++)
+        for(int ih=0; ih<shapeZ.y; ih++)
+        for(int id=0; id<shapeZ.z; id++)
         for(int in=0; in<shapeZ.n; in++)
         {
             INDICS indics[] = {
-                {ib, ih},
+                {ib, ih, id},
                 {in}
             };
-            device::causalScan4d_cpu_Forward<scalar_t>(
+            device::causalScan5d_cpu_Forward<scalar_t>(
                 shapeX,
                 shapeZ,
                 shapeA,
@@ -188,7 +189,7 @@ torch::Tensor causalScan4d_cpu_Forward(
     return O;
 }
 
-std::vector<torch::Tensor> causalScan4d_cpu_Backward(
+std::vector<torch::Tensor> causalScan5d_cpu_Backward(
     torch::Tensor gradO,
     torch::Tensor X, 
     torch::Tensor Z,
@@ -201,22 +202,23 @@ std::vector<torch::Tensor> causalScan4d_cpu_Backward(
     auto gradA = torch::zeros_like(A);
     auto gradB = torch::zeros_like(B);
     auto gradC = torch::zeros_like(C);
-    AT_DISPATCH_FLOATING_TYPES(gradO.type(), "causalScan4d_cpu_Backward", ([&] {
+    AT_DISPATCH_FLOATING_TYPES(gradO.type(), "causalScan5d_cpu_Backward", ([&] {
         wrap_t<scalar_t> deltaX = SHAPE5D(gradX);
         wrap_t<scalar_t> deltaO = SHAPE5D(gradO);
         wrap_t<scalar_t> deltaZ = SHAPE5D(gradZ);
         wrap_t<scalar_t> deltaA = SHAPE5D(gradA);
         wrap_t<scalar_t> deltaB = SHAPE5D(gradB);
         wrap_t<scalar_t> deltaC = SHAPE5D(gradC);
-        for(int ib=0; ib<deltaZ.b; ib++)
-        for(int ih=0; ih<deltaZ.d; ih++)
+        for(int ib=0; ib<deltaZ.x; ib++)
+        for(int ih=0; ih<deltaZ.y; ih++)
+        for(int id=0; id<deltaZ.z; id++)
         for(int in=0; in<deltaZ.n; in++)
         {
             INDICS indics[] = {
-                {ib, ih},
+                {ib, ih, id},
                 {in}
             };
-            device::causalScan4d_cpu_Backward<scalar_t>(
+            device::causalScan5d_cpu_Backward<scalar_t>(
                 (scalar_t*)X.data_ptr(),
                 (scalar_t*)Z.data_ptr(),
                 (scalar_t*)A.data_ptr(),
@@ -239,7 +241,7 @@ std::vector<torch::Tensor> causalScan4d_cpu_Backward(
 #ifndef __PYBINDED__
 #define __PYBINDED__
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-    m.def("forward", &causalScan4d_cpu_Forward, "");
-    m.def("backward", &causalScan4d_cpu_Backward, "");
+    m.def("forward", &causalScan5d_cpu_Forward, "");
+    m.def("backward", &causalScan5d_cpu_Backward, "");
 }
 #endif//__PYBINDED__

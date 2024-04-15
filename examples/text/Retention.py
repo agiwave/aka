@@ -1,8 +1,8 @@
 import aka.nn as nn
 import aka.numpy as np
 try:
-    from examples.text.CausalScan4d import CausalScan4d
-    causalScan = CausalScan4d.apply
+    from examples.text.CausalScan5d import causal_scan
+    causalScan = causal_scan.apply
 except ImportError:
     causalScan = None
     print('Warn: CausalScan4d import failured.')
@@ -61,14 +61,14 @@ def RetentionBlock(**kwargs):
         C = apply_rotary_emb(C, cache)
         B = apply_rotary_emb(B, cache)
 
-        if causalScan5d is not None:
+        if causalScan is not None:
             ssm_state = None if state is None else state.get('ssm_state',None)
             ssm_state = ssm_state if ssm_state is not None else np.zeros(b, 1, self.num_heads, self.embed_dim//self.num_heads, self.value_dim//self.num_heads, dtype=x.dtype, device=x.device)
             A = np.exp(self.decay.view(1,1,self.num_heads,1,1))
             B = np.rearrange('b h l (d n)->b l h d n', B, d=1)
             x = np.rearrange('b h l (d n)->b l h d n', x, n=1)
             C = np.rearrange('b h l (d n)->b l h d n', C, d=1)
-            x, ssm_state = causalScan5d(x, ssm_state, A, B, C)
+            x, ssm_state = causalScan(x, ssm_state, A, B, C)
             x = x.view(b, l, self.num_heads, -1)
             if state is not None:
                 state['ssm_state'] = ssm_state.detach()
