@@ -5,11 +5,11 @@ import os
 
 script_dir = os.path.dirname(__file__)
 if cuda.is_available():
-    causal_scan_kernel = ext.load('CausalScan', [
+    causal_scan_kernel = ext.load('extCausalScan', [
         os.path.join(script_dir, 'CausalScan.cu')
     ]) 
 else:
-    causal_scan_kernel = ext.load('CausalScan', [
+    causal_scan_kernel = ext.load('extCausalScan', [
         os.path.join(script_dir, 'CausalScan.hpp')
     ]) 
 

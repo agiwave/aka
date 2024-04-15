@@ -1,8 +1,8 @@
 import aka.nn as nn
 import aka.numpy as np
 try:
-    from examples.text.CausalScan5d import causal_scan
-    causalScan = causal_scan.apply
+    from CausalScan5d import CausalScan
+    causalScan = CausalScan.apply
 except ImportError:
     causalScan = None
     print('Warn: CausalScan5d import failured.')
