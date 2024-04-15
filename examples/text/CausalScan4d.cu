@@ -3,14 +3,15 @@
 #ifndef __wrap_t__
 #define __wrap_t__
 template <typename scalar_t> struct wrap_t{
-    int x, y, z, l, n, s;
+    int b, l, d, n;
+    int stepb, stepl;
     scalar_t* p;
 };
 #endif//__wrap_t__
 
 #ifndef IDX5D
-#define IDX5D(shape) ((((blockIdx.x % shape.x) * shape.l * shape.y + blockIdx.y % shape.y) * shape.z + blockIdx.z % shape.z) * shape.n + threadIdx.x % shape.n)
-#define Ptr5D(shape) (shape.p + ((((blockIdx.x % shape.x) * shape.l * shape.y + blockIdx.y % shape.y ) * shape.z + blockIdx.z % shape.z) * shape.n + threadIdx.x % shape.n))
+#define IDX5D(shape) ((blockIdx.x % shape.b) * shape.stepb + (blockIdx.y % shape.d) * shape.n + threadIdx.x % shape.n)
+#define Ptr5D(shape) (shape.p + IDX5D(shape))
 #endif//IDX5D
 
 #define atomAdd atomicAdd
@@ -36,18 +37,18 @@ namespace { namespace device {
         int i = 0;
         while(i++<shapeO.l) {
             if( i % 1024 == 0 ) {
-                pH += shapeZ.s;
+                pH += shapeZ.stepl;
                 *pH = zh;
             }
             zh = (*pA) * zh + (*pB) * (*pX);
             atomAdd(pO, ((*pC) * zh));
-            pX += shapeX.s;
-            pA += shapeA.s;
-            pB += shapeB.s;
-            pC += shapeC.s;
-            pO += shapeO.s;
+            pX += shapeX.stepl;
+            pA += shapeA.stepl;
+            pB += shapeB.stepl;
+            pC += shapeC.stepl;
+            pO += shapeO.stepl;
         }
-        pZ[(shapeZ.l-1)*shapeZ.s] = zh;
+        pZ[(shapeZ.l-1)*shapeZ.stepl] = zh;
     }
 
     template <typename scalar_t> __global__ void causalScan4d_Backward(
@@ -75,7 +76,7 @@ namespace { namespace device {
         pA += sa;
         pB += sb;
         pC += sc;
-        scalar_t * pGradO = Ptr5D(gradO);
+        scalar_t * pGradO = gradO.p + sx;
         scalar_t * pGradX = gradX.p + sx;
         scalar_t * pGradZ = gradZ.p + sz;
         scalar_t * pGradA = gradA.p + sa;
@@ -90,34 +91,34 @@ namespace { namespace device {
             int ibegin = igroups * GROUP_SIZE;
             int group_length = (igroups==groups-1)?(length-ibegin):GROUP_SIZE;
 
-            scalar_t * pIX = pX + ibegin*gradX.s;
-            scalar_t * pIA = pA + ibegin*gradA.s;
-            scalar_t * pIB = pB + ibegin*gradB.s;
-            zhs[0] = pZ[igroups*gradZ.s];
+            scalar_t * pIX = pX + ibegin*gradX.stepl;
+            scalar_t * pIA = pA + ibegin*gradA.stepl;
+            scalar_t * pIB = pB + ibegin*gradB.stepl;
+            zhs[0] = pZ[igroups*gradZ.stepl];
             for(int i=0; i<group_length; i++) {
                 zhs[i+1] = (*pIA) * zhs[i] + (*pIB) * (*pIX);
-                pIA += gradA.s;
-                pIB += gradB.s;
-                pIX += gradX.s;
+                pIA += gradA.stepl;
+                pIB += gradB.stepl;
+                pIX += gradX.stepl;
             }
 
             int iend = ibegin + group_length;
-            scalar_t * pIC = pC + iend * gradC.s;
-            scalar_t * pIGradO = pGradO + iend * gradO.s;
-            scalar_t * pIGradX = pGradX + iend * gradX.s;
-            scalar_t * pIGradA = pGradA + iend * gradA.s;
-            scalar_t * pIGradB = pGradB + iend * gradB.s;
-            scalar_t * pIGradC = pGradC + iend * gradC.s;
+            scalar_t * pIC = pC + iend * gradC.stepl;
+            scalar_t * pIGradO = pGradO + iend * gradO.stepl;
+            scalar_t * pIGradX = pGradX + iend * gradX.stepl;
+            scalar_t * pIGradA = pGradA + iend * gradA.stepl;
+            scalar_t * pIGradB = pGradB + iend * gradB.stepl;
+            scalar_t * pIGradC = pGradC + iend * gradC.stepl;
             while(group_length-->0) {
-                pIA -= gradA.s;
-                pIB -= gradB.s;
-                pIX -= gradX.s;
-                pIC -= gradC.s;
-                pIGradO -= gradO.s;
-                pIGradA -= gradA.s;
-                pIGradB -= gradB.s;
-                pIGradX -= gradX.s;
-                pIGradC -= gradC.s;
+                pIA -= gradA.stepl;
+                pIB -= gradB.stepl;
+                pIX -= gradX.stepl;
+                pIC -= gradC.stepl;
+                pIGradO -= gradO.stepl;
+                pIGradA -= gradA.stepl;
+                pIGradB -= gradB.stepl;
+                pIGradX -= gradX.stepl;
+                pIGradC -= gradC.stepl;
 
                 atomAdd(pIGradC, (*pIGradO) * zhs[group_length+1]);
                 gradh += (*pIGradO) * (*pC);
@@ -154,7 +155,7 @@ torch::Tensor causalScan4d_cuda_Forward(
         wrap_t<scalar_t> shapeC = SHAPE5D(C);
         wrap_t<scalar_t> shapeO = SHAPE5D(O);
         int threads = shapeZ.n;
-        const dim3 blocks(O.size(0), O.size(2), O.size(3));    
+        const dim3 blocks(shapeZ.b, shapeZ.d);    
         device::causalScan4d_Forward<scalar_t><<<blocks, threads>>>(
             shapeX,
             shapeZ,
@@ -191,7 +192,7 @@ std::vector<torch::Tensor> causalScan4d_cuda_Backward(
         wrap_t<scalar_t> deltaB = SHAPE5D(gradB);
         wrap_t<scalar_t> deltaC = SHAPE5D(gradC);
         int threads = deltaZ.n;
-        const dim3 blocks(gradO.size(0), gradO.size(2), gradO.size(3));
+        const dim3 blocks(deltaZ.b, deltaZ.d);
         device::causalScan4d_Backward<scalar_t><<<blocks, threads>>>(
             (scalar_t*)X.data_ptr(),
             (scalar_t*)Z.data_ptr(),

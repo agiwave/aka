@@ -89,7 +89,10 @@ namespace { namespace device {
     }
 }}
 
-#define SHAPE4D(t) {(int)t.size(0), (int)t.size(1), (int)t.size(2), (int)(t.size(1)*t.size(2)), (int)t.size(2) }
+#define SHAPE4D(t) {(int)t.size(0), (int)t.size(1), (int)t.size(2), \
+        (int)(t.size(1)*t.size(2)), \
+        (t.size(1)==1)?0:(int)t.size(2) \
+}
 
 torch::Tensor causalScan_cpu_Forward(torch::Tensor Z, torch::Tensor A, torch::Tensor B) {
     auto O = torch::zeros_like(B);

@@ -120,7 +120,7 @@ if __name__ == "__main__":
         # ),
         dict( args, name = 'Mamba',
             layers = [
-                dict(att_args, name='Mamba')] * 24
+                dict(att_args, name='Mamba', num_heads=384)] * 12
         ),
         dict( args, name = 'RetNet',
             layers = [
