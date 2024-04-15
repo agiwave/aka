@@ -86,7 +86,7 @@ namespace { namespace device {
 
 #undef atomAdd
 #define __PYBINDED__
-#include "./CausalScan.hpp"
+#include "./CausalScan.cpp"
 torch::Tensor causalScan_cuda_Forward(torch::Tensor Z, torch::Tensor A, torch::Tensor B) {
     if(!A.is_cuda()) {
         return causalScan_cpu_Forward(Z,A,B);
