@@ -216,26 +216,35 @@ torch::Tensor causalScan4d_Forward(
             wrap_t<scalar_t> shapeB = SHAPE5D(B);
             wrap_t<scalar_t> shapeC = SHAPE5D(C);
             wrap_t<scalar_t> shapeO = SHAPE5D(O);
-            int stepb = shapeZ.d * shapeZ.n;
-            at::parallel_for(0, shapeZ.b * shapeZ.d * shapeZ.n, 0, [&](int64_t start, int64_t end){
-                while(start<end){
-                    INDICS indics[] = {
-                        {(int)(start/stepb), (int)((start/shapeZ.n)%shapeZ.d)},
-                        {(int)(start%shapeZ.n)}
-                    };
-                    device::causalScan4d_Forward_cpu<scalar_t>(
-                        shapeX,
-                        shapeZ,
-                        shapeA,
-                        shapeB,
-                        shapeC,
-                        shapeO,
-                        indics[0],
-                        indics[1]
-                    );
-                    start++;
+            for(int ib=0; ib<shapeZ.b; ib++)
+            for(int ih=0; ih<shapeZ.d; ih++)
+            for(int in=0; in<shapeZ.n; in++)
+            {
+                INDICS indics[] = {
+                    {ib, ih},
+                    {in}
                 };
-            });
+                device::causalScan4d_Forward_cpu<scalar_t>(
+                    shapeX,
+                    shapeZ,
+                    shapeA,
+                    shapeB,
+                    shapeC,
+                    shapeO,
+                    indics[0],
+                    indics[1]
+                );
+            }
+            // int stepb = shapeZ.d * shapeZ.n;
+            // at::parallel_for(0, shapeZ.b * shapeZ.d * shapeZ.n, 0, [&](int64_t start, int64_t end){
+            //     while(start<end){
+            //         INDICS indics[] = {
+            //             {(int)(start/stepb), (int)((start/shapeZ.n)%shapeZ.d)},
+            //             {(int)(start%shapeZ.n)}
+            //         };
+            //         start++;
+            //     };
+            // });
         }));
     }
     return O;
@@ -290,31 +299,40 @@ std::vector<torch::Tensor> causalScan4d_Backward(
             wrap_t<scalar_t> deltaA = SHAPE5D(gradA);
             wrap_t<scalar_t> deltaB = SHAPE5D(gradB);
             wrap_t<scalar_t> deltaC = SHAPE5D(gradC);
-            int stepb = deltaZ.d * deltaZ.n;
-            at::parallel_for(0, deltaZ.b * deltaZ.d * deltaZ.n, 0, [&](int64_t start, int64_t end){
-                while(start<end){
-                    INDICS indics[] = {
-                        {(int)(start/stepb), (int)((start/deltaZ.n)%deltaZ.d)},
-                        {(int)(start%deltaZ.n)}
-                    };
-                    device::causalScan4d_Backward_cpu<scalar_t>(
-                        (scalar_t*)X.data_ptr(),
-                        (scalar_t*)Z.data_ptr(),
-                        (scalar_t*)A.data_ptr(),
-                        (scalar_t*)B.data_ptr(),
-                        (scalar_t*)C.data_ptr(),
-                        deltaO,
-                        deltaX,
-                        deltaZ,
-                        deltaA,
-                        deltaB,
-                        deltaC,
-                        indics[0],
-                        indics[1]
-                    );
-                    start++;
+            for(int ib=0; ib<deltaZ.b; ib++)
+            for(int ih=0; ih<deltaZ.d; ih++)
+            for(int in=0; in<deltaZ.n; in++)
+            {
+                INDICS indics[] = {
+                    {ib, ih},
+                    {in}
                 };
-            });
+                device::causalScan4d_Backward_cpu<scalar_t>(
+                    (scalar_t*)X.data_ptr(),
+                    (scalar_t*)Z.data_ptr(),
+                    (scalar_t*)A.data_ptr(),
+                    (scalar_t*)B.data_ptr(),
+                    (scalar_t*)C.data_ptr(),
+                    deltaO,
+                    deltaX,
+                    deltaZ,
+                    deltaA,
+                    deltaB,
+                    deltaC,
+                    indics[0],
+                    indics[1]
+                );
+            }
+            // int stepb = deltaZ.d * deltaZ.n;
+            // at::parallel_for(0, deltaZ.b * deltaZ.d * deltaZ.n, 0, [&](int64_t start, int64_t end){
+            //     while(start<end){
+            //         INDICS indics[] = {
+            //             {(int)(start/stepb), (int)((start/deltaZ.n)%deltaZ.d)},
+            //             {(int)(start%deltaZ.n)}
+            //         };
+            //         start++;
+            //     };
+            // });
         }));
     }
     return {gradX, gradZ, gradA, gradB, gradC};
