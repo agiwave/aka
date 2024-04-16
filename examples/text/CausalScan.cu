@@ -1,22 +1,21 @@
+#ifndef __INLINE_CPP__
+#define DEVICEINDICS 
 #include <cuda.h>
 #include <cuda_runtime.h>
+#endif//__INLINE_CPP__
 
-#ifndef __SHAPE_T__
-#define __SHAPE_T__
 typedef struct{
     int b, l, d, stepb, stepl;
 }shape_t;
-#endif//__SHAPE_T__
-
-#ifndef IDX
+#define SHAPE4D(t) {(int)t.size(0), (int)t.size(1), (int)t.size(2), \
+    (int)(t.size(1)*t.size(2)), \
+    (t.size(1)==1)?0:(int)t.size(2) \
+}
 #define IDX_SCALE(shape) ((blockIdx.x % shape.b) * shape.stepb + blockIdx.y % shape.d)
 #define IDX(shape) (blockIdx.x * shape.stepb + blockIdx.y)
-#endif//IDX
-
-#define atomAdd atomicAdd
 
 namespace { namespace device {
-    template <typename scalar_t> __global__ void causalScan_Forward(
+    template <typename scalar_t> __global__ void causalScan_Forward_cuda(
         const shape_t shapeA,
         const shape_t shapeO,
         const shape_t shapeZ,
@@ -24,6 +23,7 @@ namespace { namespace device {
         scalar_t * pA,
         scalar_t * pX,
         scalar_t * pO
+        DEVICEINDICS
     )
     {
         int idxX = IDX(shapeO);
@@ -41,7 +41,7 @@ namespace { namespace device {
         }
     }
 
-    template <typename scalar_t> __global__ void causalScan_Backward(
+    template <typename scalar_t> __global__ void causalScan_Backward_cuda(
         const shape_t shapeA,
         const shape_t shapeO,
         const shape_t shapeZ,
@@ -52,6 +52,7 @@ namespace { namespace device {
         scalar_t * pZ,
         scalar_t * pA,
         scalar_t * pO
+        DEVICEINDICS
     )
     {
         scalar_t grad = 0.0;
@@ -69,7 +70,7 @@ namespace { namespace device {
         while(length-->1) {
             grad += *gradO;
             (*gradX) = grad;
-            atomAdd(gradA, (*pO) * grad);
+            atomicAdd(gradA, (*pO) * grad);
             grad *= (*pA);
             gradA -= shapeA.stepl;
             gradX -= shapeO.stepl;
@@ -79,25 +80,22 @@ namespace { namespace device {
         }
         grad += *gradO;
         (*gradX) = grad;
-        atomAdd(gradA, pZ[idxZ] * grad);
+        atomicAdd(gradA, pZ[idxZ] * grad);
         gradZ[idxZ] = (*pA) * grad;
     }
 }}
 
-#undef atomAdd
-#define __PYBINDED__
-#include "./CausalScan.cpp"
+#ifndef __INLINE_CPP__
+#include <torch/extension.h>
+#include <vector>
 torch::Tensor causalScan_cuda_Forward(torch::Tensor Z, torch::Tensor A, torch::Tensor B) {
-    if(!A.is_cuda()) {
-        return causalScan_cpu_Forward(Z,A,B);
-    }
     auto O = torch::zeros_like(B);
     AT_DISPATCH_FLOATING_TYPES(O.scalar_type(), "causalScan_Forward", ([&] {
         shape_t shapeA = SHAPE4D(A);
         shape_t shapeO = SHAPE4D(B);
         shape_t shapeZ = SHAPE4D(Z);
         const dim3 blocks(O.size(0), O.size(2));
-        device::causalScan_Forward<scalar_t><<<blocks, 1>>>(
+        device::causalScan_Forward_cuda<scalar_t><<<blocks, 1>>>(
             shapeA,
             shapeO,
             shapeZ,
@@ -111,9 +109,6 @@ torch::Tensor causalScan_cuda_Forward(torch::Tensor Z, torch::Tensor A, torch::T
 }
 
 std::vector<torch::Tensor> causalScan_cuda_Backward(torch::Tensor gradO, torch::Tensor Z, torch::Tensor A, torch::Tensor O) {
-    if(!A.is_cuda()) {
-        return causalScan_cpu_Backward(gradO,Z,A,O);
-    }
     auto gradA = torch::zeros_like(A);
     auto gradX = torch::zeros_like(O);
     auto gradZ = torch::zeros_like(Z);
@@ -122,7 +117,7 @@ std::vector<torch::Tensor> causalScan_cuda_Backward(torch::Tensor gradO, torch::
         shape_t shapeO = SHAPE4D(gradX);
         shape_t shapeZ = SHAPE4D(gradZ);
         const dim3 blocks(O.size(0), O.size(2));
-        device::causalScan_Backward<scalar_t><<<blocks, 1>>>(
+        device::causalScan_Backward_cuda<scalar_t><<<blocks, 1>>>(
             shapeA,
             shapeO,
             shapeZ,
@@ -137,8 +132,4 @@ std::vector<torch::Tensor> causalScan_cuda_Backward(torch::Tensor gradO, torch::
     }));
     return {gradZ, gradA, gradX};
 }
-
-PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-    m.def("forward", &causalScan_cuda_Forward, "");
-    m.def("backward", &causalScan_cuda_Backward, "");
-}
+#endif//__INLINE_CPP__

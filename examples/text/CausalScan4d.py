@@ -6,12 +6,13 @@ import os
 script_dir = os.path.dirname(__file__)
 if cuda.is_available():
     causal_scan_kernel = ext.load('extCausalScan4d', [
-        os.path.join(script_dir, 'CausalScan4d.cu')
-    ]) 
+        os.path.join(script_dir, 'CausalScan4d.cu'),
+        os.path.join(script_dir, 'CausalScan4d.cpp')
+    ])
 else:
     causal_scan_kernel = ext.load('extCausalScan4d', [
-        os.path.join(script_dir, 'CausalScan4d.cpp')
-    ]) 
+        os.path.join(script_dir, 'CausalScan4d_cpu.cpp')
+    ])
 
 class CausalScan(torch.autograd.Function):
     '''
@@ -47,23 +48,23 @@ class CausalScan(torch.autograd.Function):
 if __name__ == "__main__":
     device = torch.device("cuda")
     Z = torch.tensor([
-        [[[1,1,1,1]]]
+        [[1,1,1,1]]
     ], device=device, dtype=torch.float)
     A = torch.tensor([
-        [[[2]]],
-        [[[2]]]
+        [[2]],
+        [[2]]
     ], device=device, dtype=torch.float)
     B = torch.tensor([
-        [[[3,3,3,3]]],
-        [[[3,3,3,3]]]
+        [[3,3,3,3]],
+        [[3,3,3,3]]
     ], device=device, dtype=torch.float)
     X = torch.tensor([
-        [[[4]]],
-        [[[4]]]
+        [[4]],
+        [[4]]
     ], device=device, dtype=torch.float)
     C = torch.tensor([
-        [[[5,5,5,5]]],
-        [[[5,5,5,5]]],
+        [[5,5,5,5]],
+        [[5,5,5,5]],
     ], device=device, dtype=torch.float)
     (Z, A, B, X, C) = [
        item.unsqueeze(0)

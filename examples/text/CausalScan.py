@@ -6,11 +6,12 @@ import os
 script_dir = os.path.dirname(__file__)
 if cuda.is_available():
     causal_scan_kernel = ext.load('extCausalScan', [
-        os.path.join(script_dir, 'CausalScan.cu')
+        os.path.join(script_dir, 'CausalScan.cu'),
+        os.path.join(script_dir, 'CausalScan.cpp')
     ]) 
 else:
     causal_scan_kernel = ext.load('extCausalScan', [
-        os.path.join(script_dir, 'CausalScan.cpp')
+        os.path.join(script_dir, 'CausalScan_cpu.cpp')
     ]) 
 
 class CausalScan(torch.autograd.Function):
@@ -43,7 +44,7 @@ class CausalScan(torch.autograd.Function):
 
 if __name__ == "__main__":
     device = torch.device("cuda")
-    Z = torch.randn(5, 1, 3, 4, device=device)
-    A = torch.randn(5, 2, 3, 1, device=device)
-    B = torch.randn(5, 2, 3, 4, device=device)
+    Z = torch.randn(5, 1, 3, device=device)
+    A = torch.randn(5, 2, 3, device=device)
+    B = torch.randn(5, 2, 3, device=device)
     print(CausalScan.apply(Z, A, B))
