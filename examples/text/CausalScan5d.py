@@ -4,14 +4,9 @@ import torch.utils.cpp_extension as ext
 import os
 
 script_dir = os.path.dirname(__file__)
-if cuda.is_available():
-    causal_scan_kernel = ext.load('extCausalScan5d', [
-        os.path.join(script_dir, 'CausalScan5d.cu')
-    ]) 
-else:
-    causal_scan_kernel = ext.load('extCausalScan5d', [
-        os.path.join(script_dir, 'CausalScan5d.cpp')
-    ]) 
+causal_scan_kernel = ext.load('extCausalScan4d', [
+    os.path.join(script_dir, 'CausalScan5d.' + ('cu' if cuda.is_available() else 'cpp'))
+]) 
 
 class CausalScan(torch.autograd.Function):
     '''
