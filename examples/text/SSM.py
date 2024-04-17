@@ -67,12 +67,10 @@ def SSMBlock(**kwargs):
         x = np.rearrange('b l (h v)->b l h v', x, h=self.num_heads) * np.sigmoid(gv).unsqueeze(-1)
 
         if causalScan is not None:
-            x = x.unsqueeze(-1)
             A = A.unsqueeze(-1)
             B = B.unsqueeze(-2)
             C = C.unsqueeze(-2)
             x, ssm_state = causalScan(ssm_state, A, B, x, C)
-            x = x.squeeze(-1)
         else:
             # -- RNN --
             y = np.empty(x.shape, device=x.device)

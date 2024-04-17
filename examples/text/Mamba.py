@@ -81,9 +81,7 @@ def MambaBlock(**kwargs):
             deltaA = np.exp(np.einsum('blh,hn->blhn', delta, A))
             deltaB = np.einsum('blh,bln->blhn', delta, B)
             C = C.view(b, l, 1, self.num_states)
-            x = x.unsqueeze(-1)
             x, ssm_state = causalScan(x, ssm_state, deltaA, deltaB, C)
-            x = x.squeeze(-1)
         else:
             # -- Trunc-Wise RNN --
             x = np.rearrange('b l (h d)->b l h d', x, h=self.num_heads)

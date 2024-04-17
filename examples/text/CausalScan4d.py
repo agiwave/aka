@@ -22,16 +22,36 @@ class CausalScan(torch.autograd.Function):
 
     Return:
     (Y, h(n))
+
+    Args:
+    x : (b, l, d)
+    h : (b, 1, d, n)
+    A : (b, l, d, n)
+    B : (b, l, d, n)
+    C : (b, l, d, n)
+
+    Output:
+    y : (b, l, d)
+    h : (b, 1, d, n)
     '''
     @staticmethod
     def forward(ctx, x, h, A, B, C):
         (x, h, A, B, C) = [item.contiguous() for item in [x, h, A, B, C]]
+        x = x.unsqueeze(-1)
+        for item in [x, h, A, B, C]:
+            assert len(item.shape) == 4
+            assert item.size(0) == 1 or item.size(0) == h.size(0)
+            assert item.size(1) == 1 or item.size(1) == x.size(1)
+            assert item.size(2) == 1 or item.size(2) == h.size(2)
+            assert item.size(3) == 1 or item.size(3) == h.size(3)
+        assert h.size(1) == 1, 'hidden_state size should be one'
+
         (_, l, _, _) = x.shape
         group_size = 1023   # Must match the size in kernel.
         h = torch.repeat_interleave(h, (l+group_size-1)//group_size+1, dim=1)
-        o = causal_scan_kernel.forward(x, h, A, B, C)
+        x = causal_scan_kernel.forward(x, h, A, B, C)
         ctx.save_for_backward(x, h, A, B, C)
-        return o, h[:,-1:]
+        return x.squeeze(-1), h[:,-1:]
 
     @staticmethod
     def backward(ctx, gradO, gradZO):

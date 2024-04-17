@@ -15,26 +15,35 @@ class CausalScan(torch.autograd.Function):
     h(2) = a(2) * h(1) + b(2)
     ...
     h(n) = a(n) * h(n-1) + b(n)
+
+    Args:
+    h : (b, 1, d)
+    A : (b, l, d)
+    x : (b, l, d)
+
+    Return:
+    y : (b, l, d)
     '''
     @staticmethod
-    def forward(ctx, Z, A, B):
-        bz, lz, dz = Z.shape
-        ba, la, da = A.shape
-        bb, lb, db = B.shape
-        assert lz == 1 and lb % la == 0
-        assert bz == bb
-        assert ba == 1 or ba == bb
-        assert dz == db 
-        assert dz == db and db % da == 0
-        O = causal_scan_kernel.forward(Z.contiguous(), A.contiguous(), B.contiguous())
-        ctx.save_for_backward(Z, A, O)
+    def forward(ctx, h, A, x):
+       for item in [x, h, A]:
+            assert len(item.shape) == 3
+            assert item.size(0) == 1 or item.size(0) == h.size(0)
+            assert item.size(1) == 1 or item.size(1) == x.size(1)
+            assert h.size(2) % item.size(2) == 0
+        assert h.size(1) == 1
+        h = h.contiguous()
+        A = A.contiguous()
+        x = x.contiguous()
+        O = causal_scan_kernel.forward(h, A, x)
+        ctx.save_for_backward(h, A, O)
         return O
 
     @staticmethod
     def backward(ctx, gradO):
-        Z, A, O = ctx.saved_variables
-        gradZ, gradA, gradB = causal_scan_kernel.backward(gradO, Z, A, O)
-        return gradZ, gradA, gradB
+        h, A, x = ctx.saved_variables
+        gradh, gradA, gradx = causal_scan_kernel.backward(gradO, h, A, x)
+        return gradh, gradA, gradx
 
 if __name__ == "__main__":
     device = torch.device("cuda")
