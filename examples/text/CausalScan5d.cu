@@ -24,7 +24,7 @@ typedef struct{
     (int)(t.size(3) * t.size(4)),\
     (scalar_t*)t.data_ptr()\
 }
-#define IDX5D(shape) ((((ib % shape.b) * shape.l * shape.h + ih % shape.h) * shape.d + id % shape.d) * shape.n + in % shape.n)
+#define IDX5D(shape) ((ib % shape.b) * shape.stepb + (ih % shape.h) * shape.steph + (id % shape.d) * shape.n + in % shape.n)
 #define Ptr5D(shape) (shape.p + IDX5D(shape))
 #define GROUP_SIZE 1023
 #endif//__COMMON_H__
@@ -75,16 +75,20 @@ namespace { namespace device {
         int idx = blockIdx.x << SHIFT_BLOCK_SIZE | threadIdx.x;
         if( idx >= range ) return;
         int ib = idx / shapeS.stepl;
-        int ih = (idx / shapeS.steph) % shapeS.h;
-        int id = (idx / shapeS.n) % shapeS.d;
-        int in = idx % shapeS.n;
-        scalar_t * pX = Ptr5D(shapeX);
-        scalar_t * pZ = Ptr5D(shapeZ);
-        scalar_t * pS = Ptr5D(shapeS);
+        int ihdn = idx % shapeS.stepl;
+        int ih = ihdn / shapeS.steph;
+        int idn = ihdn % shapeS.steph;
+        int id = idn / shapeS.n;
+        int in = idn % shapeS.n;
+
+        int sx = IDX5D(shapeX);
+        scalar_t * pX = shapeX.p + sx;
+        scalar_t * pO = shapeO.p + sx;
+        scalar_t * pZ = shapeZ.p + ib * shapeZ.stepb + ihdn;
+        scalar_t * pS = shapeS.p + ib * shapeS.stepb + ihdn;
         scalar_t * pA = Ptr5D(shapeA);
         scalar_t * pB = Ptr5D(shapeB);
         scalar_t * pC = Ptr5D(shapeC);
-        scalar_t * pO = Ptr5D(shapeO);
         scalar_t zh = *pZ;
         int i = 0;
         while(i<shapeO.l) {
@@ -124,12 +128,15 @@ namespace { namespace device {
         int idx = blockIdx.x << SHIFT_BLOCK_SIZE | threadIdx.x;
         if( idx >= range ) return;
         int ib = idx / shapeS.stepl;
-        int ih = (idx / shapeS.steph) % shapeS.h;
-        int id = (idx / shapeS.n) % shapeS.d;
-        int in = idx % shapeS.n;
+        int ihdn = idx % shapeS.stepl;
+        int ih = ihdn / shapeS.steph;
+        int idn = ihdn % shapeS.steph;
+        int id = idn / shapeS.n;
+        int in = idn % shapeS.n;
+
         int sx = IDX5D(shapeX);
-        int sz = IDX5D(shapeZ);
-        int ss = IDX5D(shapeS);
+        int sz = ib * shapeZ.stepb + ihdn;
+        int ss = ib * shapeS.stepb + ihdn;
         int sa = IDX5D(shapeA);
         int sb = IDX5D(shapeB);
         int sc = IDX5D(shapeC);

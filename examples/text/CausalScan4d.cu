@@ -73,15 +73,18 @@ namespace { namespace device {
         int idx = blockIdx.x << SHIFT_BLOCK_SIZE | threadIdx.x;
         if( idx >= range ) return;
         int ib = idx / shapeS.stepl;
-        int id = (idx / shapeS.n) % shapeS.d;
-        int in = idx % shapeS.n;
-        scalar_t * pX = Ptr5D(shapeX);
-        scalar_t * pZ = Ptr5D(shapeZ);
-        scalar_t * pS = Ptr5D(shapeS);
+        int idn = idx % shapeS.stepl;
+        int id = idn / shapeS.n;
+        int in = idn % shapeS.n;
+
+        int sx = IDX5D(shapeX);
+        scalar_t * pX = shapeX.p + sx;
+        scalar_t * pO = shapeO.p + sx;
+        scalar_t * pZ = shapeZ.p + ib * shapeZ.stepb + idn;
+        scalar_t * pS = shapeS.p + ib * shapeS.stepb + idn;
         scalar_t * pA = Ptr5D(shapeA);
         scalar_t * pB = Ptr5D(shapeB);
         scalar_t * pC = Ptr5D(shapeC);
-        scalar_t * pO = Ptr5D(shapeO);
         scalar_t zh = *pZ;
         int i = 0;
         while(i<shapeO.l) {
@@ -121,11 +124,13 @@ namespace { namespace device {
         int idx = blockIdx.x << SHIFT_BLOCK_SIZE | threadIdx.x;
         if( idx >= range ) return;
         int ib = idx / shapeS.stepl;
-        int id = (idx / shapeS.n) % shapeS.d;
-        int in = idx % shapeS.n;
+        int idn = idx % shapeS.stepl;
+        int id = idn / shapeS.n;
+        int in = idn % shapeS.n;
+
         int sx = IDX5D(shapeX);
-        int sz = IDX5D(shapeZ);
-        int ss = IDX5D(shapeS);
+        int sz = ib * shapeZ.stepb + idn;
+        int ss = ib * shapeS.stepb + idn;
         int sa = IDX5D(shapeA);
         int sb = IDX5D(shapeB);
         int sc = IDX5D(shapeC);
