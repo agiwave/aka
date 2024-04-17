@@ -217,37 +217,32 @@ torch::Tensor causalScan5d_Forward(
             wrap_t<scalar_t> shapeB = SHAPE5D(B);
             wrap_t<scalar_t> shapeC = SHAPE5D(C);
             wrap_t<scalar_t> shapeO = SHAPE5D(O);
-            for(int ib=0; ib<shapeZ.x; ib++)
-            for(int ih=0; ih<shapeZ.y; ih++)
-            for(int id=0; id<shapeZ.z; id++)
-            for(int in=0; in<shapeZ.n; in++)
-            {
-                INDICS indics[] = {
-                    {ib, ih, id},
-                    {in}
+            int stepb = shapeZ.y * shapeZ.z;
+            at::parallel_for(0, shapeZ.x * stepb, 0, [&](int64_t start, int64_t end){
+                while(start<end){
+                    int ib = start / stepb;
+                    int ih = (start / shapeZ.z) % shapeZ.y;
+                    int id = start % shapeZ.z;
+                    for(int in=0; in<shapeZ.n; in++)
+                    {
+                        INDICS indics[] = {
+                            {ib, ih, id},
+                            {in}
+                        };
+                        device::causalScan5d_Forward_cpu<scalar_t>(
+                            shapeX,
+                            shapeZ,
+                            shapeA,
+                            shapeB,
+                            shapeC,
+                            shapeO,
+                            indics[0],
+                            indics[1]
+                        );
+                    }
+                    start++;
                 };
-                device::causalScan5d_Forward_cpu<scalar_t>(
-                    shapeX,
-                    shapeZ,
-                    shapeA,
-                    shapeB,
-                    shapeC,
-                    shapeO,
-                    indics[0],
-                    indics[1]
-                );
-            }
-            // int stepy = shapeZ.z * shapeZ.n;
-            // int stepx = stepy * shapeZ.y;
-            // at::parallel_for(0, shapeZ.x * stepx, 0, [&](int64_t start, int64_t end){
-            //     while(start<end){
-            //         INDICS indics[] = {
-            //             {(int)(start/stepx), (int)((start/stepy)%shapeZ.y), (int)((start/shapeZ.n)%shapeZ.z)},
-            //             {(int)(start%shapeZ.n)}
-            //         };
-            //         start++;
-            //     };
-            // });
+            });
         }));
     }
     return O;

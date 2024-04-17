@@ -153,30 +153,24 @@ torch::Tensor causalScan_Forward(torch::Tensor Z, torch::Tensor A, torch::Tensor
         #endif//__DISABLE_CUDA__
     }else{
         AT_DISPATCH_FLOATING_TYPES(O.scalar_type(), "causalScan_Forward", ([&] {
-            for(int ib=0; ib<shapeO.b; ib++)
-            for(int ih=0; ih<shapeO.d; ih++){
-                INDICS indics[] = {
-                    {ib, ih}
-                };
-                device::causalScan_Forward_cpu<scalar_t>(
-                    shapeA,
-                    shapeO,
-                    shapeZ,
-                    (scalar_t*)Z.data_ptr(),
-                    (scalar_t*)A.data_ptr(),
-                    (scalar_t*)B.data_ptr(),
-                    (scalar_t*)O.data_ptr(),
-                    indics[0]
-                );
-            }
-            // at::parallel_for(0, shapeO.b * shapeZ.d, 0, [&](int64_t start, int64_t end){
-            //     while(start<end){
-            //         INDICS indics[] = {
-            //             {(int)(start/shapeZ.d), (int)(start%shapeZ.d)}
-            //         };
-            //         start++;
-            //     }
-            // });
+            at::parallel_for(0, shapeO.b * shapeZ.d, 0, [&](int64_t start, int64_t end){
+                while(start<end){
+                    INDICS indics[] = {
+                        {(int)(start/shapeZ.d), (int)(start%shapeZ.d)}
+                    };
+                    device::causalScan_Forward_cpu<scalar_t>(
+                        shapeA,
+                        shapeO,
+                        shapeZ,
+                        (scalar_t*)Z.data_ptr(),
+                        (scalar_t*)A.data_ptr(),
+                        (scalar_t*)B.data_ptr(),
+                        (scalar_t*)O.data_ptr(),
+                        indics[0]
+                    );
+                    start++;
+                }
+            });
         }));
     }
     return O;

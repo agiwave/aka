@@ -216,35 +216,31 @@ torch::Tensor causalScan4d_Forward(
             wrap_t<scalar_t> shapeB = SHAPE5D(B);
             wrap_t<scalar_t> shapeC = SHAPE5D(C);
             wrap_t<scalar_t> shapeO = SHAPE5D(O);
-            for(int ib=0; ib<shapeZ.b; ib++)
-            for(int ih=0; ih<shapeZ.d; ih++)
-            for(int in=0; in<shapeZ.n; in++)
-            {
-                INDICS indics[] = {
-                    {ib, ih},
-                    {in}
+            int stepb = shapeZ.d * shapeZ.n;
+            at::parallel_for(0, shapeZ.b * shapeZ.d, 0, [&](int64_t start, int64_t end){
+                while(start<end){
+                    int ib = start/shapeZ.d;
+                    int id = start%shapeZ.d;
+                    for(int in=0; in<shapeZ.n; in++)
+                    {
+                        INDICS indics[] = {
+                            {ib, id},
+                            {in}
+                        };
+                        device::causalScan4d_Forward_cpu<scalar_t>(
+                            shapeX,
+                            shapeZ,
+                            shapeA,
+                            shapeB,
+                            shapeC,
+                            shapeO,
+                            indics[0],
+                            indics[1]
+                        );
+                    }
+                    start++;
                 };
-                device::causalScan4d_Forward_cpu<scalar_t>(
-                    shapeX,
-                    shapeZ,
-                    shapeA,
-                    shapeB,
-                    shapeC,
-                    shapeO,
-                    indics[0],
-                    indics[1]
-                );
-            }
-            // int stepb = shapeZ.d * shapeZ.n;
-            // at::parallel_for(0, shapeZ.b * shapeZ.d * shapeZ.n, 0, [&](int64_t start, int64_t end){
-            //     while(start<end){
-            //         INDICS indics[] = {
-            //             {(int)(start/stepb), (int)((start/shapeZ.n)%shapeZ.d)},
-            //             {(int)(start%shapeZ.n)}
-            //         };
-            //         start++;
-            //     };
-            // });
+            });
         }));
     }
     return O;
