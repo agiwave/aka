@@ -1,7 +1,7 @@
 import aka.nn as nn
 import aka.numpy as np
 try:
-    from CausalScan5d import CausalScan
+    from CausalScan4d import CausalScan
     causalScan = CausalScan.apply
 except ImportError:
     causalScan = None
@@ -52,8 +52,8 @@ def RetentionBlock(**kwargs):
             ((C, B), x) = (kv, x)
 
         b, l, _ = x.size()
-        # q, k, v, g = [proj(x) for proj in [self.q_proj, self.k_proj, self.v_proj, self.g_proj]]
-        C, B, x = [t.view(b, l, self.num_heads, -1) for t in [C,B,x]]
+        C, B = [np.rearrange('b l (h d n)->(b h) l d n', t, h=self.num_heads, d=1) for t in [C,B]]
+        x = np.rearrange('b l (h d)->(b h) l d', x, h=self.num_heads) 
         B *= self.scaling
 
         # -- rotary embedding --
@@ -62,16 +62,15 @@ def RetentionBlock(**kwargs):
 
         if causalScan is not None:
             ssm_state = None if state is None else state.get('ssm_state',None)
-            ssm_state = ssm_state if ssm_state is not None else np.zeros(b, 1, self.num_heads, self.value_dim//self.num_heads, self.embed_dim//self.num_heads, dtype=x.dtype, device=x.device)
-            A = np.exp(self.decay.view(1,1,self.num_heads,1,1))
-            B = B.unsqueeze(-2)
-            C = C.unsqueeze(-2)
+            ssm_state = ssm_state if ssm_state is not None else np.zeros(b*self.num_heads, 1, self.value_dim//self.num_heads, self.embed_dim//self.num_heads, dtype=x.dtype, device=x.device)
+            A = np.exp(self.decay.view(self.num_heads,1,1,1))
             x, ssm_state = causalScan(x, ssm_state, A, B, C)
             if state is not None:
                 state['ssm_state'] = ssm_state.detach()
+            x = np.rearrange('(b h) l d->b l h d', x, h=self.num_heads) 
         else:
-            C, B = [np.rearrange('b l h d -> b h l d', t) for t in [C, B]]
-            x = np.rearrange('b l n d -> b n l d', x)
+            C, B = [np.rearrange('(b h) l d -> b h l d', t.squeeze(-2), h=self.num_heads) for t in [C, B]]
+            x = np.rearrange('(b h) l d -> b h l d', x, h=self.num_heads)
 
             # Pure py implementation. Pool performance and Memory efficiency.
             def compute_mask(decay, qlen, klen):

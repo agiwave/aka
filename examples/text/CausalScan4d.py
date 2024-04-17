@@ -40,7 +40,7 @@ class CausalScan(torch.autograd.Function):
         x = x.unsqueeze(-1)
         for item in [x, h, A, B, C]:
             assert len(item.shape) == 4
-            assert item.size(0) == 1 or item.size(0) == h.size(0)
+            assert h.size(0) % item.size(0) == 0
             assert item.size(1) == 1 or item.size(1) == x.size(1)
             assert h.size(2) % item.size(2) == 0
             assert item.size(3) == 1 or item.size(3) == h.size(3)
