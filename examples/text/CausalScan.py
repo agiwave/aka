@@ -28,9 +28,10 @@ class CausalScan(torch.autograd.Function):
     def forward(ctx, x, h, A):
         for item in [x, h, A]:
             assert len(item.shape) == 3
-            assert h.size(2) % item.size(2) == 0
             assert item.size(0) == 1 or item.size(0) == h.size(0)
             assert item.size(1) == 1 or item.size(1) == x.size(1)
+            assert h.size(2) % item.size(2) == 0
+
         assert h.size(1) == 1
         x = x.contiguous()
         h = h.contiguous()
@@ -49,5 +50,5 @@ if __name__ == "__main__":
     device = torch.device("cuda")
     Z = torch.randn(5, 1, 3, device=device)
     A = torch.randn(5, 2, 3, device=device)
-    B = torch.randn(5, 2, 3, device=device)
-    print(CausalScan.apply(Z, A, B))
+    X = torch.randn(5, 2, 3, device=device)
+    print(CausalScan.apply(X, Z, A))

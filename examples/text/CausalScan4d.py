@@ -42,27 +42,26 @@ class CausalScan(torch.autograd.Function):
             assert len(item.shape) == 4
             assert item.size(0) == 1 or item.size(0) == h.size(0)
             assert item.size(1) == 1 or item.size(1) == x.size(1)
-            assert item.size(2) == 1 or item.size(2) == h.size(2)
+            assert h.size(2) % item.size(2) == 0
             assert item.size(3) == 1 or item.size(3) == h.size(3)
         assert h.size(1) == 1, 'hidden_state size should be one'
 
-        (_, l, _, _) = x.shape
         group_size = 1023   # Must match the size in kernel.
-        h = torch.repeat_interleave(h, (l+group_size-1)//group_size+1, dim=1)
-        x = causal_scan_kernel.forward(x, h, A, B, C)
-        ctx.save_for_backward(x, h, A, B, C)
-        return x.squeeze(-1), h[:,-1:]
+        S = torch.empty(h.size(0), (x.size(1)+group_size-1)//group_size, h.size(2), h.size(3), dtype=h.dtype, device=h.device)
+        y = causal_scan_kernel.forward(x, h, S, A, B, C)
+        ctx.save_for_backward(x, S, A, B, C)
+        return y.squeeze(-1), h
 
     @staticmethod
     def backward(ctx, gradO, gradH):
-        x, h, A, B, C = ctx.saved_variables
-        gradX, gradH, gradA, gradB, gradC = causal_scan_kernel.backward(gradO, gradH, x, h, A, B, C)
-        return gradX, gradH, gradA, gradB, gradC
+        x, S, A, B, C = ctx.saved_variables
+        gradX, gradH, gradA, gradB, gradC = causal_scan_kernel.backward(gradO.unsqueeze(-1), gradH, x, S, A, B, C)
+        return gradX.squeeze(-1), gradH, gradA, gradB, gradC
 
 if __name__ == "__main__":
     device = torch.device("cpu")
     Z = torch.tensor([
-        [[1,1,1,1]]
+        [1,1,1,1]
     ], device=device, dtype=torch.float)
     A = torch.tensor([
         [[2]],
@@ -73,8 +72,8 @@ if __name__ == "__main__":
         [[3,3,3,3]]
     ], device=device, dtype=torch.float)
     X = torch.tensor([
-        [[4]],
-        [[4]]
+        [4],
+        [4]
     ], device=device, dtype=torch.float)
     C = torch.tensor([
         [[5,5,5,5]],

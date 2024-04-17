@@ -4,7 +4,7 @@ import torch.utils.cpp_extension as ext
 import os
 
 script_dir = os.path.dirname(__file__)
-causal_scan_kernel = ext.load('extCausalScan4d', [
+causal_scan_kernel = ext.load('extCausalScan5d', [
     os.path.join(script_dir, 'CausalScan5d.' + ('cu' if cuda.is_available() else 'cpp'))
 ]) 
 
@@ -44,18 +44,17 @@ class CausalScan(torch.autograd.Function):
             assert item.size(4) == 1 or item.size(4) == h.size(4)
         assert h.size(1) == 1, 'hidden_state size should be one'
         
-        length = x.size(1)
         group_size = 1023   # Must match the size in kernel.
-        h = torch.repeat_interleave(h, (length+group_size-1)//group_size+1, dim=1)
-        x = causal_scan_kernel.forward(x, h, A, B, C)
-        ctx.save_for_backward(x, h, A, B, C)
-        return x.squeeze(-1), h[:,-1:]
+        S = torch.empty(h.size(0), (x.size(1)+group_size-1)//group_size, h.size(2), h.size(3), h.size(4), dtype=h.dtype, device=h.device)
+        y = causal_scan_kernel.forward(x, h, S, A, B, C)
+        ctx.save_for_backward(x, S, A, B, C)
+        return y.squeeze(-1), h
 
     @staticmethod
     def backward(ctx, gradO, gradH):
-        x, h, A, B, C = ctx.saved_variables
-        gradx, gradh, gradA, gradB, gradC = causal_scan_kernel.backward(gradO, gradH, x, h, A, B, C)
-        return gradx, gradh, gradA, gradB, gradC
+        x, S, A, B, C = ctx.saved_variables
+        gradX, gradH, gradA, gradB, gradC = causal_scan_kernel.backward(gradO.unsqueeze(-1), gradH, x, S, A, B, C)
+        return gradX.squeeze(-1), gradH, gradA, gradB, gradC
 
 if __name__ == "__main__":
     device = torch.device("cuda")

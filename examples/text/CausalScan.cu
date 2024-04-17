@@ -4,14 +4,16 @@ typedef struct{
     int b, l, d, stepb, stepl;
 }shape_t;
 typedef struct{
-    int x, y;
+    int x;
 }INDICS;
 #define SHAPE4D(t) {(int)t.size(0), (int)t.size(1), (int)t.size(2), \
     (int)(t.size(1)*t.size(2)), \
     (t.size(1)==1)?0:(int)t.size(2) \
 }
-#define IDX_SCALE(shape) ((blockIdx.x % shape.b) * shape.stepb + blockIdx.y % shape.d)
-#define IDX(shape) (blockIdx.x * shape.stepb + blockIdx.y)
+#define SHIFT_BLOCK_SIZE 8
+#define BLOCK_SIZE (1<<SHIFT_BLOCK_SIZE)
+#define IDX_SCALE(shape) ((ib % shape.b) * shape.stepb + id % shape.d)
+#define IDX(shape) (ib * shape.stepb + id)
 #endif//__COMMON_H__
 
 #ifndef __DISABLE_CUDA__
@@ -37,7 +39,7 @@ typedef struct{
     #ifdef atomAdd
         #undef atomAdd
     #endif//
-    #define DEVICEINDICS ,const INDICS& blockIdx
+    #define DEVICEINDICS ,const INDICS& blockIdx, const INDICS& threadIdx
     #define CAUSAL_FORWARD causalScan_Forward_cpu
     #define CAUSAL_BACKWARD causalScan_Backward_cpu
     #ifdef __global__
@@ -55,10 +57,16 @@ namespace { namespace device {
         scalar_t * pZ,
         scalar_t * pA,
         scalar_t * pX,
-        scalar_t * pO
+        scalar_t * pO,
+        int range
         DEVICEINDICS
     )
     {
+        int idx = blockIdx.x << SHIFT_BLOCK_SIZE | threadIdx.x;
+        if( idx >= range ) return;
+        int ib = idx / shapeO.d;
+        int id = idx % shapeO.d;
+
         int idxX = IDX(shapeO);
         pA += IDX_SCALE(shapeA);
         pX += idxX;
@@ -84,10 +92,16 @@ namespace { namespace device {
         scalar_t * gradO,
         scalar_t * pZ,
         scalar_t * pA,
-        scalar_t * pO
+        scalar_t * pO,
+        int range
         DEVICEINDICS
     )
     {
+        int idx = blockIdx.x << SHIFT_BLOCK_SIZE | threadIdx.x;
+        if( idx >= range ) return;
+        int ib = idx / shapeO.d;
+        int id = idx % shapeO.d;
+        
         scalar_t grad = 0.0;
         int idxA = IDX_SCALE(shapeA);
         int idxO = IDX(shapeO);
@@ -130,22 +144,24 @@ namespace { namespace device {
 #include <torch/extension.h>
 #include <vector>
 torch::Tensor causalScan_Forward(torch::Tensor X, torch::Tensor Z, torch::Tensor A) {
-    auto O = torch::zeros_like(X);
+    auto O = torch::empty_like(X);
     shape_t shapeA = SHAPE4D(A);
     shape_t shapeO = SHAPE4D(X);
     shape_t shapeZ = SHAPE4D(Z);
+    int range = (int)(shapeO.b * shapeO.d);
     if(A.is_cuda()) {
         #ifndef __DISABLE_CUDA__
         AT_DISPATCH_FLOATING_TYPES(O.scalar_type(), "causalScan_Forward", ([&] {
-            const dim3 blocks(O.size(0), O.size(2));
-            device::causalScan_Forward_cuda<scalar_t><<<blocks, 1>>>(
+            int blocks = (range + BLOCK_SIZE - 1) >> SHIFT_BLOCK_SIZE;
+            device::causalScan_Forward_cuda<scalar_t><<<blocks, BLOCK_SIZE>>>(
                 shapeA,
                 shapeO,
                 shapeZ,
                 (scalar_t*)Z.data_ptr(),
                 (scalar_t*)A.data_ptr(),
                 (scalar_t*)X.data_ptr(),
-                (scalar_t*)O.data_ptr()
+                (scalar_t*)O.data_ptr(),
+                range
             );
         }));
         #else//
@@ -153,10 +169,11 @@ torch::Tensor causalScan_Forward(torch::Tensor X, torch::Tensor Z, torch::Tensor
         #endif//__DISABLE_CUDA__
     }else{
         AT_DISPATCH_FLOATING_TYPES(O.scalar_type(), "causalScan_Forward", ([&] {
-            at::parallel_for(0, shapeO.b * shapeZ.d, 0, [&](int64_t start, int64_t end){
+            at::parallel_for(0, range, 0, [&](int64_t start, int64_t end){
                 while(start<end){
                     INDICS indics[] = {
-                        {(int)(start/shapeZ.d), (int)(start%shapeZ.d)}
+                        {(int)(start >> SHIFT_BLOCK_SIZE)},
+                        {(int)(start % BLOCK_SIZE)}
                     };
                     device::causalScan_Forward_cpu<scalar_t>(
                         shapeA,
@@ -166,7 +183,9 @@ torch::Tensor causalScan_Forward(torch::Tensor X, torch::Tensor Z, torch::Tensor
                         (scalar_t*)A.data_ptr(),
                         (scalar_t*)X.data_ptr(),
                         (scalar_t*)O.data_ptr(),
-                        indics[0]
+                        range,
+                        indics[0],
+                        indics[1]
                     );
                     start++;
                 }
@@ -183,11 +202,12 @@ std::vector<torch::Tensor> causalScan_Backward(torch::Tensor gradO, torch::Tenso
     shape_t shapeA = SHAPE4D(gradA);
     shape_t shapeO = SHAPE4D(gradX);
     shape_t shapeZ = SHAPE4D(gradZ);
+    int range = (int)(shapeO.b * shapeO.d);
     if(A.is_cuda()) {
         #ifndef __DISABLE_CUDA__
         AT_DISPATCH_FLOATING_TYPES(O.scalar_type(), "causalScan_Backward", ([&] {
-            const dim3 blocks(O.size(0), O.size(2));
-            device::causalScan_Backward_cuda<scalar_t><<<blocks, 1>>>(
+            int blocks = (range + BLOCK_SIZE - 1) >> SHIFT_BLOCK_SIZE;
+            device::causalScan_Backward_cuda<scalar_t><<<blocks, BLOCK_SIZE>>>(
                 shapeA,
                 shapeO,
                 shapeZ,
@@ -197,7 +217,8 @@ std::vector<torch::Tensor> causalScan_Backward(torch::Tensor gradO, torch::Tenso
                 (scalar_t*)gradO.data_ptr(),
                 (scalar_t*)Z.data_ptr(),
                 (scalar_t*)A.data_ptr(),
-                (scalar_t*)O.data_ptr()
+                (scalar_t*)O.data_ptr(),
+                range
             );
         }));
         #else//
@@ -206,10 +227,10 @@ std::vector<torch::Tensor> causalScan_Backward(torch::Tensor gradO, torch::Tenso
     }
     else{
         AT_DISPATCH_FLOATING_TYPES(O.scalar_type(), "causalScan_Backward", ([&] {
-            for(int ib=0; ib<shapeO.b; ib++)
-            for(int ih=0; ih<shapeO.d; ih++){
+            for(int start=0; start<range; start++){
                 INDICS indics[] = {
-                    {ib, ih}
+                    {(int)(start >> SHIFT_BLOCK_SIZE)},
+                    {(int)(start % BLOCK_SIZE)}
                 };
                 device::causalScan_Backward_cpu(
                     shapeA,
@@ -222,7 +243,9 @@ std::vector<torch::Tensor> causalScan_Backward(torch::Tensor gradO, torch::Tenso
                     (scalar_t*)Z.data_ptr(),
                     (scalar_t*)A.data_ptr(),
                     (scalar_t*)O.data_ptr(),
-                    indics[0]
+                    range,
+                    indics[0],
+                    indics[1]
                 );
             }
             // at::parallel_for(0, shapeO.b * shapeZ.d, 0, [&](int64_t start, int64_t end){
