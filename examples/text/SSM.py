@@ -5,7 +5,7 @@ try:
     causalScan = CausalScan.apply
 except ImportError:
     causalScan = None
-    print('Warn: CausalScan5d import failured.')
+    print('Warn: CausalScan5d import failed.')
 
 def SSMBlock(**kwargs):
     '''

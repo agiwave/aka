@@ -5,7 +5,7 @@ try:
     causalScan = CausalScan.apply
 except ImportError:
     causalScan = None
-    print('Warn: CausalScanSSM import failured.')
+    print('Warn: CausalScan4d import failed.')
 
 def MambaBlock(**kwargs):
     """A single Mamba block, as described in Figure 3 in Section 3.4 in the Mamba paper [1]."""

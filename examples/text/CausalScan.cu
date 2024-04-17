@@ -129,10 +129,10 @@ namespace { namespace device {
 
 #include <torch/extension.h>
 #include <vector>
-torch::Tensor causalScan_Forward(torch::Tensor Z, torch::Tensor A, torch::Tensor B) {
-    auto O = torch::zeros_like(B);
+torch::Tensor causalScan_Forward(torch::Tensor X, torch::Tensor Z, torch::Tensor A) {
+    auto O = torch::zeros_like(X);
     shape_t shapeA = SHAPE4D(A);
-    shape_t shapeO = SHAPE4D(B);
+    shape_t shapeO = SHAPE4D(X);
     shape_t shapeZ = SHAPE4D(Z);
     if(A.is_cuda()) {
         #ifndef __DISABLE_CUDA__
@@ -144,7 +144,7 @@ torch::Tensor causalScan_Forward(torch::Tensor Z, torch::Tensor A, torch::Tensor
                 shapeZ,
                 (scalar_t*)Z.data_ptr(),
                 (scalar_t*)A.data_ptr(),
-                (scalar_t*)B.data_ptr(),
+                (scalar_t*)X.data_ptr(),
                 (scalar_t*)O.data_ptr()
             );
         }));
@@ -164,7 +164,7 @@ torch::Tensor causalScan_Forward(torch::Tensor Z, torch::Tensor A, torch::Tensor
                         shapeZ,
                         (scalar_t*)Z.data_ptr(),
                         (scalar_t*)A.data_ptr(),
-                        (scalar_t*)B.data_ptr(),
+                        (scalar_t*)X.data_ptr(),
                         (scalar_t*)O.data_ptr(),
                         indics[0]
                     );
@@ -176,7 +176,7 @@ torch::Tensor causalScan_Forward(torch::Tensor Z, torch::Tensor A, torch::Tensor
     return O;
 }
 
-std::vector<torch::Tensor> causalScan_Backward(torch::Tensor gradO, torch::Tensor Z, torch::Tensor A, torch::Tensor O) {
+std::vector<torch::Tensor> causalScan_Backward(torch::Tensor gradO, torch::Tensor O, torch::Tensor Z, torch::Tensor A) {
     auto gradA = torch::zeros_like(A);
     auto gradX = torch::zeros_like(O);
     auto gradZ = torch::zeros_like(Z);
@@ -236,7 +236,7 @@ std::vector<torch::Tensor> causalScan_Backward(torch::Tensor gradO, torch::Tenso
         }));
     }
 
-    return {gradZ, gradA, gradX};
+    return {gradX, gradZ, gradA};
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {

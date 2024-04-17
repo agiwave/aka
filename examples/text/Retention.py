@@ -5,7 +5,7 @@ try:
     causalScan = CausalScan.apply
 except ImportError:
     causalScan = None
-    print('Warn: CausalScan4d import failured.')
+    print('Warn: CausalScan5d import failed.')
 
 def RetentionBlock(**kwargs):
     def __init__(self,**kwargs):
@@ -115,30 +115,6 @@ def RetentionBlock(**kwargs):
             return x
     return __init__(nn.Module(forward=forward), **kwargs)
 
-def RetentionArgs(name):
-    args = nn.Object(
-        vocab_dim = 32,
-        latent_dim = 384,
-        dropout = 0.1,
-        bias = False, # bias in Linear?
-    )
-    mlp_args = nn.Object(
-        name = 'Xproj',
-        hidden_dim = 384 * 3
-    ),
-    attn_args = nn.Object(
-        name = 'Retention',
-        num_heads = 8,
-        num_kv_groups = 8,
-        rotary_embedding = True
-    ),
-    match name:
-        case 'Ret':
-            args.layers = [attn_args, mlp_args]*3
-        case _:
-            assert False, f"Unknown Ret name{name}"
-    return args
-
 def RetNet(name):
     import aka.repo as repo
 
@@ -207,9 +183,5 @@ if __name__ == "__main__":
     print('Model loaded')
     for w in m.generator("1girl"):
         print(w, end='')
-# <s> 1girl, absurdres, animal ear fluff, animal ears, bangs, bare shoulders, black hair, blue archive, blunt bangs, blush, closed mouth, collarbone, commentary request, eyes visible through hair, green eyes, hair between eyes, halo, hand on own face, hand up, highres, jacket, kisaki blue archive, long hair, long sleeves, looking at viewer, open clothes, open jacket, shinonome asu, simple background, solo, track jacket, upper body, white background, white jacket</s>
-    # from RomeArena import TrainRoles
-    # TrainRoles([
-    #     # 'Gemma-20m', 
-    #     'Retention-Ret',
-    # ], lr = 6e-4, epochs=4)
+    # <s> 1girl, absurdres, animal ear fluff, animal ears, bangs, bare shoulders, black hair, blue archive, blunt bangs, blush, closed mouth, collarbone, commentary request, eyes visible through hair, green eyes, hair between eyes, halo, hand on own face, hand up, highres, jacket, kisaki blue archive, long hair, long sleeves, looking at viewer, open clothes, open jacket, shinonome asu, simple background, solo, track jacket, upper body, white background, white jacket</s>
+

@@ -1,11 +1,11 @@
 import aka.nn as nn
 import aka.numpy as np
 try:
-    from examples.text.CausalScan import CausalScan
+    from CausalScan import CausalScan
     causalScan = CausalScan.apply
 except ImportError:
     causalScan = None
-    print('Warn: CausalScan import failured.')
+    print('Warn: CausalScan import failed.')
 
 def HawkBlock(**kwargs):
     '''
@@ -41,14 +41,14 @@ def HawkBlock(**kwargs):
 
         # -- RG_LRU or GRU --
         x = x.view(b, l, self.num_heads, -1) # np.rearrange('b l (h d)->b l h d', x, h=self.num_heads) # [B,L,H,D]
-        rg = ((self.c * np.softplus(self.delta)) * np.sigmoid(rg).unsqueeze(-1))  # [B,L,H,1]
+        rg = ((self.c * np.softplus(self.delta)) * np.sigmoid(rg).unsqueeze(-1))  # [B,L,H]
         (x, ig) = (1-np.exp(rg)) * np.sigmoid(ig).unsqueeze(-1) * x, None # The orginal paper: np.sqrt(1-rg**2)*np.sigmoid(ig).unsqueeze(-1) * x
         gru_state = None if state is None else state.get('gru_state',None)
 
         # ---- RNN --->
         if causalScan is not None:
             gru_state = gru_state if gru_state is not None else np.zeros(b, 1, self.hidden_dim, dtype=x.dtype, device=x.device)
-            x = causalScan(gru_state, np.exp(rg).squeeze(-1), x.view(b, l, -1))
+            x = causalScan(x.view(b, l, -1), gru_state, np.exp(rg).squeeze(-1))
             gru_state = x[:,-1:]
         else:
             gru_state = gru_state if gru_state is not None else np.zeros(b, 1, self.num_heads, self.hidden_dim//self.num_heads, dtype=x.dtype, device=x.device)
@@ -109,10 +109,10 @@ if __name__ == "__main__":
         #     layers = [
         #         dict(att_args, name='Hawk'), mlp_args] * 12
         # ),
-        # dict( args, name = 'HawkOnly',
-        #     layers = [
-        #         dict(att_args, name='Hawk', num_heads=192)] * 24
-        # ),
+        dict( args, name = 'HawkOnly',
+            layers = [
+                dict(att_args, name='Hawk', num_heads=192)] * 24
+        ),
         # dict( args, name = 'Griffin',
         #     layers = [
         #         dict(att_args, name='Hawk'), mlp_args,

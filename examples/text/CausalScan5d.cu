@@ -118,7 +118,7 @@ namespace { namespace device {
         scalar_t * pGradB = gradB.p + sb;
         scalar_t * pGradC = gradC.p + sc;
 
-        scalar_t gradh = 0.0;
+        scalar_t gradh = *pGradZ;
         scalar_t zhs[GROUP_SIZE+1];
         int groups = (length + GROUP_SIZE - 1) / GROUP_SIZE;
         for(int igroups=groups-1; igroups>=0; igroups--){
@@ -250,6 +250,7 @@ torch::Tensor causalScan5d_Forward(
 
 std::vector<torch::Tensor> causalScan5d_Backward(
     torch::Tensor gradO,
+    torch::Tensor gradZ,
     torch::Tensor X,
     torch::Tensor Z,
     torch::Tensor A,
@@ -257,7 +258,6 @@ std::vector<torch::Tensor> causalScan5d_Backward(
     torch::Tensor C
 ) {
     auto gradX = torch::zeros_like(X);
-    auto gradZ = torch::zeros_like(Z);
     auto gradA = torch::zeros_like(A);
     auto gradB = torch::zeros_like(B);
     auto gradC = torch::zeros_like(C);

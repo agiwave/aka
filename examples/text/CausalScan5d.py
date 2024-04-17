@@ -52,9 +52,9 @@ class CausalScan(torch.autograd.Function):
         return x.squeeze(-1), h[:,-1:]
 
     @staticmethod
-    def backward(ctx, gradO, gradZO):
+    def backward(ctx, gradO, gradH):
         x, h, A, B, C = ctx.saved_variables
-        gradx, gradh, gradA, gradB, gradC = causal_scan_kernel.backward(gradO, x, h, A, B, C)
+        gradx, gradh, gradA, gradB, gradC = causal_scan_kernel.backward(gradO, gradH, x, h, A, B, C)
         return gradx, gradh, gradA, gradB, gradC
 
 if __name__ == "__main__":
