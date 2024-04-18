@@ -1,13 +1,16 @@
+try:
+    import torch.cuda as cuda
+    import torch.utils.cpp_extension as ext
+    import os
+    script_dir = os.path.dirname(__file__)
+    causal_scan_kernel = ext.load('extCausalScan4d', [
+        os.path.join(script_dir, 'CausalScan4d.' + ('cu' if cuda.is_available() else 'cpp'))
+    ])
+except ImportError:
+    causal_scan_kernel = None
+    print('Warn: CausalScan4d import failed.')
+
 import torch
-import torch.cuda as cuda
-import torch.utils.cpp_extension as ext
-import os
-
-script_dir = os.path.dirname(__file__)
-causal_scan_kernel = ext.load('extCausalScan4d', [
-    os.path.join(script_dir, 'CausalScan4d.' + ('cu' if cuda.is_available() else 'cpp'))
-]) 
-
 class CausalScan(torch.autograd.Function):
     '''
     Formula:
@@ -58,37 +61,4 @@ class CausalScan(torch.autograd.Function):
         gradX, gradH, gradA, gradB, gradC = causal_scan_kernel.backward(gradO.unsqueeze(-1), gradH, x, S, A, B, C)
         return gradX.squeeze(-1), gradH, gradA, gradB, gradC
 
-if __name__ == "__main__":
-    device = torch.device("cpu")
-    Z = torch.tensor([
-        [1,1,1,1]
-    ], device=device, dtype=torch.float)
-    A = torch.tensor([
-        [[2]],
-        [[2]]
-    ], device=device, dtype=torch.float)
-    B = torch.tensor([
-        [[3,3,3,3]],
-        [[3,3,3,3]]
-    ], device=device, dtype=torch.float)
-    X = torch.tensor([
-        [4],
-        [4]
-    ], device=device, dtype=torch.float)
-    C = torch.tensor([
-        [[5,5,5,5]],
-        [[5,5,5,5]],
-    ], device=device, dtype=torch.float)
-    (Z, A, B, X, C) = [
-       item.unsqueeze(0)
-        for item in [Z, A, B, X, C]
-    ]
-    (A, B, X, C) = [
-        torch.repeat_interleave(item, 2, dim=1)
-        for item in [A, B, X, C]
-    ]
-    (Z, A, B, X) = [
-        torch.repeat_interleave(item, 2, dim=2)
-        for item in [Z, A, B, X]
-    ]
-    print(CausalScan.apply(Z, A, B, X, C))
+causalScan = None if causal_scan_kernel is None else CausalScan.apply

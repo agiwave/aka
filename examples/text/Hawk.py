@@ -1,11 +1,6 @@
 import aka.nn as nn
 import aka.numpy as np
-try:
-    from CausalScan import CausalScan
-    causalScan = CausalScan.apply
-except ImportError:
-    causalScan = None
-    print('Warn: CausalScan import failed.')
+from CausalScan import causalScan
 
 def HawkBlock(**kwargs):
     '''

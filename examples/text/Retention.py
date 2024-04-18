@@ -1,11 +1,6 @@
 import aka.nn as nn
 import aka.numpy as np
-try:
-    from CausalScan4d import CausalScan
-    causalScan = CausalScan.apply
-except ImportError:
-    causalScan = None
-    print('Warn: CausalScan5d import failed.')
+from CausalScan4d import causalScan
 
 def RetentionBlock(**kwargs):
     def __init__(self,**kwargs):
@@ -107,7 +102,7 @@ def RetentionBlock(**kwargs):
             x = y
 
         # Gate and Output
-        x = self.group_norm(x).reshape(b, x.size(1), self.value_dim)
+        x = self.group_norm(x).reshape(b, l, self.value_dim)
         if self.xproj is not None:
             return self.xproj.proj_out(x, go)
         else:
@@ -178,9 +173,44 @@ def RetNet(name):
     return m
 
 if __name__ == "__main__":
-    m = RetNet('data/SDPrompt-RetNet-300M')
-    print('Model loaded')
-    for w in m.generator("1girl"):
-        print(w, end='')
+    # m = RetNet('data/SDPrompt-RetNet-300M')
+    # print('Model loaded')
+    # for w in m.generator("1girl"):
+    #     print(w, end='')
     # <s> 1girl, absurdres, animal ear fluff, animal ears, bangs, bare shoulders, black hair, blue archive, blunt bangs, blush, closed mouth, collarbone, commentary request, eyes visible through hair, green eyes, hair between eyes, halo, hand on own face, hand up, highres, jacket, kisaki blue archive, long hair, long sleeves, looking at viewer, open clothes, open jacket, shinonome asu, simple background, solo, track jacket, upper body, white background, white jacket</s>
+    args = dict(
+        vocab_dim = 64,
+        latent_dim = 384,
+        xproj_heads = 4,
+        resident_gate = True,
+        gate='go',
+        activation='silu',
+        dropout = 0.1,
+        bias = False
+    )
+    roles = [
+        dict( 
+            args, 
+            name = 'RetNet',
+            layers = [
+                dict(
+                    name = 'Retention',
+                    num_heads = 8,
+                    mixers = [
+                        dict(
+                            name = 'Conv1d'
+                        )
+                    ]
+                ), 
+                dict(
+                    name = "Xproj",
+                    hidden_dim = args['latent_dim']*3,
+                )
+            ] * 12
+        )
+    ]
 
+    from RomeArena import TrainRoles, RunRoles
+    # PlotRoles(roles, np.load('examples/text/hawk-losses.ckt'))
+    l = TrainRoles(roles, lr = 6e-3, epochs=1, batch_size=4, show=True, show_frequency=2)
+    # RunRoles(roles, 'My lord Sebastian')

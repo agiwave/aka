@@ -153,17 +153,18 @@ if __name__ == "__main__":
                     xproj_heads = 2,
                     layers = [
                         dict(
+                            layer,
                             name='Attention',
                             rotary_embedding = True,
                             num_heads = 16
                         ),
                         dict(
+                            layer,
                             name='Xproj',
                             hidden_dim = 512 * 3
                         )
                     ]*8,
                 )
-                return args
             case 'Tiny':
                 return dict(
                     args,
@@ -171,17 +172,18 @@ if __name__ == "__main__":
                     xproj_heads = 8,
                     layers = [
                         dict(
+                            layer,
                             name='Attention',
                             rotary_embedding = True,
                             num_heads = 16
                         ),
                         dict(
+                            layer,
                             name='Xproj',
                             hidden_dim = 1024 * 3
                         )
                     ]*8,
                 )
-                return args
             case _:
                 assert False
 

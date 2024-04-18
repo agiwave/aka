@@ -1,11 +1,6 @@
 import aka.nn as nn
 import aka.numpy as np
-try:
-    from CausalScan5d import CausalScan
-    causalScan = CausalScan.apply
-except ImportError:
-    causalScan = None
-    print('Warn: CausalScan5d import failed.')
+from CausalScan5d import causalScan
 
 def SSMBlock(**kwargs):
     '''

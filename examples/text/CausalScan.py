@@ -1,13 +1,16 @@
+try:
+    import torch.cuda as cuda
+    import torch.utils.cpp_extension as ext
+    import os
+    script_dir = os.path.dirname(__file__)
+    causal_scan_kernel = ext.load('extCausalScan', [
+        os.path.join(script_dir, 'CausalScan.' + ('cu' if cuda.is_available() else 'cpp'))
+    ])
+except ImportError:
+    causal_scan_kernel = None
+    print('Warn: CausalScan4d import failed.')
+
 import torch
-import torch.cuda as cuda
-import torch.utils.cpp_extension as ext
-import os
-
-script_dir = os.path.dirname(__file__)
-causal_scan_kernel = ext.load('extCausalScan', [
-    os.path.join(script_dir, 'CausalScan.' + ('cu' if cuda.is_available() else 'cpp'))
-]) 
-
 class CausalScan(torch.autograd.Function):
     '''
     Formula:
@@ -52,3 +55,5 @@ if __name__ == "__main__":
     A = torch.randn(5, 2, 3, device=device)
     X = torch.randn(5, 2, 3, device=device)
     print(CausalScan.apply(X, Z, A))
+
+causalScan = None if causal_scan_kernel is None else CausalScan.apply
