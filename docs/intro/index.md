@@ -1,14 +1,20 @@
-# Aka -- a toolkit for ai
+# 简介
 
-It's only a proxy to pytorch、transformers、datasets etc. For example: "import aka.numpy" is almost same to "import torch".
+这只是一个工具，它包装了大量人工智能需要的一些主要函数；
 
-## 1、to top GPTs
+也不是一个工具，因为它几乎没有什么实际的实现代码，仅仅是一些接口代理；
+
+也可以说不仅仅是一个工具，因为用它甚至可以直达当前一些主流GPT模型；
+
+却也算不上一个工具，因为它只是个人用来测试的环境而已，远不及成熟的地步；
+
+## 1、直达主流的GPT模型
 
 ### 1.1、Gemma
 
-Download gemma data first from：https://www.kaggle.com/models/google/gemma/PyTorch/2b-it/2
+先从Kaggle网站下载模型数据，比如：https://www.kaggle.com/models/google/gemma/PyTorch/2b-it/2
 
-run python：
+然后运行如下Python程序：
 
 ``` python
 import sys
@@ -23,7 +29,7 @@ for w in m.generator("The life meaning is"):
     print(w, end='')
 ```
 
-The result maybe is：
+你可能得到的输出结果：
 ```
 Model loaded
 (The life meaning is) the purpose or reason for which something exists. It is the driving force behind an organism's actions and decisions.
@@ -33,9 +39,9 @@ The life meaning can be determined through various methods, including introspect
 
 ### 1.2、Mamba
 
-Download mamba data first from：https://huggingface.co/state-spaces/mamba-130m-hf
+先从Huggingface下载可用的模型数据，比如：https://huggingface.co/state-spaces/mamba-130m-hf
 
-run Python：
+然后运行如下Python程序：
 
 ``` python
 import aka.repo as repo
@@ -90,27 +96,29 @@ for w in mamba.generator("Mamba is"):
     print(w, end='')
 ```
 
-The result maybe is:
+你可能得到的输出结果：
 
 ```
 Model loaded
 （Mamba is) a very popular and popularly used name for a variety of different species of birds. The name Mamba comes from the Latin word mamba, meaning "mamba" or "mamba-like". Mamba is a common name for a variety of birds, including the common cormorant, the common c
 ```
 
-### 1.3、Some other top models.
+### 1.3、其它已经或尝试包含的模型
 
-VQVAE、VQGAN、RWKV、RetNet、Hawk、LLAMA2 etc. 
+VQVAE、VQGAN、RWKV、RetNet、Hawk、LLAMA等等，当然也包含了一些我自己在实验的代码
 
-## 2、Prepare envirenment.
+## 2、准备环境
+
+（在这儿，php环境的准备，就不做介绍了），命令行执行：
 
 ```
 >git clone https://github.com/agiwave/aka.git
 >cd aka
 >pip install -e .
 ```
-And then, you can find those examples at : aka\example.
+然后，就可以在aka\example看到一系列范例代码了。
 
-## 3、First example maybe is: Whether a point is in a circle(r=0.5).
+## 3、第一个范例：判断一个点是否在半径为0.5的圆内
 
 ``` python
 

@@ -143,24 +143,27 @@ def Trainer(
     optimizer="Adam",
     optimizer_kwargs={},
     loss_metric = None,
-    data_parallel = False,
     forward_kwargs={},
     epochs=2,
+    data_parallel = False,
+    device=None,
     dtype=None,
     **kwargs):
 
-    if torch.cuda.is_available():
-        device = torch.device("cuda:0")
-        model = model.to(device)
-        if data_parallel is True:
-            model = torch.nn.DataParallel(model)
-    else:
-        device = torch.device("cpu")
+    if device is None:
+        if torch.cuda.is_available():
+            device = torch.device("cuda:0")
+            model = model.to(device)
+            if data_parallel is True:
+                model = torch.nn.DataParallel(model)
+        else:
+            device = torch.device("cpu")
+    model = model.to(device)
+
     if dtype is not None:
         model = model.to(dtype)
 
     # -- Train Variables --
-    train_mode = 0  # 0 -- Uninitialized, 2 -- With loss --, 3 -- Dict loss --
     ctx = TrainArgs(
         train_mode = 0,
         n_batchs = len(data_loader),
@@ -183,8 +186,9 @@ def Trainer(
             else:
                 (inputs, targets) = item[data_fields[0]], item[data_fields[1]]
 
-            inputs = inputs.to(device)
-            targets = targets.to(device)
+            if device is not None:
+                inputs = inputs.to(device)
+                targets = targets.to(device)
             if dtype is not None:
                 inputs = inputs.to(dtype)
                 targets = targets.to(dtype)
@@ -239,3 +243,6 @@ def Trainer(
                 curr_time = time.time()
                 ctx.batch_time = curr_time-start_time
                 yield ctx
+
+    if device is not None and torch.cuda.is_available():
+        model = model.to(torch.device("cpu"))
