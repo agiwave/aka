@@ -107,6 +107,87 @@ Model loaded
 
 VQVAE、VQGAN、RWKV、RetNet、Hawk、LLAMA等等，当然也包含了一些我自己在实验的代码
 
+### 1.4、一个模型竞技场
+
+将部分主流模型放在一起，比比效果。
+
+``` python
+
+import aka.nn as nn
+import aka.numpy as np
+
+args = dict(
+    vocab_dim = 64,
+    latent_dim = 384,
+    xproj_heads = 4,
+    resident_gate = True,
+    gate='go',
+    activation='silu',
+    dropout = 0.1,
+    bias = False, # bias in Linear?
+)
+att_args = dict(
+    num_heads = 8,
+    num_states = 2,
+    rot_embedding = True,
+    mixers = [
+        dict(
+            name = 'Conv1d'
+        )
+    ]
+)
+mlp_args = dict(
+    name = "Xproj",
+    hidden_dim = args['latent_dim']*3,
+)
+roles = [
+    dict( args, name = 'Hawk',
+        layers = [
+            dict(att_args, name='Hawk'), mlp_args] * 12
+    ),
+    dict( args, name = 'HawkOnly',
+        layers = [
+            dict(att_args, name='Hawk', num_heads=192)] * 24
+    ),
+    dict( args, name = 'Griffin',
+        layers = [
+            dict(att_args, name='Hawk'), mlp_args,
+            dict(att_args, name='Attention'), mlp_args,] * 6
+    ),
+    dict( args, name = 'Mamba',
+        layers = [
+            dict(att_args, name='Mamba', num_heads=384)] * 12
+    ),
+    dict( args, name = 'RetNet',
+        layers = [
+            dict(att_args, name='Retention'), mlp_args] * 12
+    ),
+    dict( args, name = 'RWKV',
+        layers = [
+            dict(
+                name = 'RWKVTMixer',
+                num_heads = 8,
+            ),
+            dict(
+                name = 'RWKVCMixer',
+                hidden_dim = args['latent_dim']*3,
+            )
+        ]*12
+    ),
+    dict( args, name = 'Attn',
+        layers = [
+            dict(att_args, name='Attention'), mlp_args] * 12
+    )
+]
+
+from RomeArena import TrainRoles, RunRoles, PlotRoles
+# PlotRoles(roles, np.load('examples/text/hawk-losses.ckt'))
+l = TrainRoles(roles, lr = 6e-3, epochs=1, batch_size=4, show=True, show_frequency=2)
+# RunRoles(roles, 'My lord Sebastian')
+
+
+```
+
 ## 2、准备环境
 
 （在这儿，php环境的准备，就不做介绍了），命令行执行：
