@@ -1,8 +1,7 @@
 import aka.nn as nn
 import aka.data as dataset
 
-def MNIST():
-    return nn.Sequential(
+model = nn.Sequential(
         nn.Flatten(),
         nn.Linear(28*28, 576),
         nn.ReLU(),
@@ -10,7 +9,7 @@ def MNIST():
     )
 
 nn.train(
-    MNIST(), 
+    model, 
     dataset.MNIST(),
     loss_metric=nn.CrossEntropyLoss(), 
     batch_size=64, 

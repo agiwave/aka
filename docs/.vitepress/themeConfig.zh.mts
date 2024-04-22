@@ -7,8 +7,11 @@ const themeConfig: LocaleSpecificConfig<DefaultTheme.Config> = {
     nav: [
       {
         text: "文档",
-        items: [{ text: "工具介绍", link: "/intro/" }],
-      },
+        items: [
+          { text: "工具介绍", link: "/intro/" },
+          { text: "原理及实践(一)", link: "/transformers/" }
+        ]
+      }
     ],
 
     lightModeSwitchTitle: "切换到浅色模式",
@@ -19,6 +22,7 @@ const themeConfig: LocaleSpecificConfig<DefaultTheme.Config> = {
         text: "",
         items: [
           { text: "简介", link: "/intro/" },
+          { text: "原理及实践(一)", link: "/transformers/" },
           // {
           //   text: "2、神经网络原理",
           //   items: [
