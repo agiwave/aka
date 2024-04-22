@@ -1,26 +1,7 @@
 import aka.nn as nn
 import aka.numpy as np
 
-try:
-    from xformers.ops.fmha import memory_efficient_attention
-    from xformers.ops.fmha.attn_bias import LowerTriangularFromBottomRightMask
-except ImportError:
-    memory_efficient_attention = None
-    LowerTriangularFromBottomRightMask = None
-
-def AttentionBlock(**kwargs):
-    '''
-    Group-Query Attention
-    Args:
-        args.latent_dim 
-        args.attn_args.k_dim(Optional, default: latent_dim)
-
-    Examples:
-        default ==> Attention
-        args.attn_args.num_heads = 8 ==> MHA: Multi-Head Attention
-        args.attn_args.num_kv_groups = 1 ==> MQA: Multi-Query Attention
-        args.attn_args.num_kv_groups = 2 ==> GQA: Group-Query Attention
-    '''
+def InfiniteAttentionBlock(**kwargs):
     def __init__(self, **kwargs):
         args = nn.Object(**kwargs)
     
@@ -44,6 +25,7 @@ def AttentionBlock(**kwargs):
         self.scale_dk = (self.group_k_dim//self.num_kv_groups)**-0.5
         self.rot_embedding = getattr(args, 'rotary_embedding', False)
         self.rope_theta = getattr(args, 'rope_theta', 10000)
+        self.beta = nn.Parameter(np.arange(self.num_heads, dtype=np.float).unsqueeze(-1))
         return self
 
     def apply_rotary_emb(x, cache, pos=0):
@@ -91,19 +73,9 @@ def AttentionBlock(**kwargs):
         k = k.view(B, L, num_kv_groups, -1)
         v = v.view(B, L, num_kv_groups, -1)
 
-        # -- append kv cache --
-        if state is not None:
-            window_size = self.window_size if self.window_size is not None else 128
-            if 'cache_kv' in state:
-                cache_k, cache_v = state['cache_kv']
-                k = np.cat((cache_k, k), dim=1)
-                v = np.cat((cache_v, v), dim=1)
-            state['cache_kv'] = (k[:,1-window_size:].detach(), v[:,1-window_size:].detach())
-
         # -- rotary embedding --
-        M = k.size(1)
         if self.rot_embedding:
-            q = apply_rotary_emb(q, cache, M-L)
+            q = apply_rotary_emb(q, cache)
             k = apply_rotary_emb(k, cache)
 
         # -- repeat kv to match q, MQA and GQA --
@@ -112,34 +84,96 @@ def AttentionBlock(**kwargs):
             k = np.repeat(k, num_heads // num_kv_groups, dim=2)
             v = np.repeat(v, num_heads // num_kv_groups, dim=2)
 
+        # -- load state --
+        if state is not None:
+            (M, z) = state.get('Mz', (
+                np.zeros(B, self.num_heads, k.size(3), v.size(3), device=q.device, dtype=q.dtype),
+                np.ones(B, self.num_heads, k.size(3), device=q.device, dtype=q.dtype)))
+        else:
+            (M, z) = (
+                np.zeros(B, self.num_heads, k.size(3), v.size(3), device=q.device, dtype=q.dtype),
+                np.ones(B, self.num_heads, k.size(3), device=q.device, dtype=q.dtype))
+
         # -- attn --
-        if memory_efficient_attention is not None:
-            if self.window_size is None:
-                y = memory_efficient_attention(q,k,v, attn_bias=LowerTriangularFromBottomRightMask())
-            else:
-                y = memory_efficient_attention(q,k,v, attn_bias=LowerTriangularFromBottomRightLocalAttentionMask(self.window_size))
-        else:
-            att = np.einsum('blnd,bmnd->bnlm', q, k) * self.scale_dk
-            att = att + causal_mask((L,M), q.dtype, q.device, window_size=self.window_size, from_bottomright=True)
+        x = np.empty_like(v)
+        (begin, step) = (0, L if self.window_size is None else self.window_size)
+        mask = causal_mask((step, step), q.dtype, q.device, from_bottomright=True)
+        while begin < L:
+            end = begin + step if L-begin>step else L
+
+            # Trunc Q，K，V
+            trunc_q = q[:,begin:end]
+            trunc_k = k[:,begin:end]
+            trunc_v = v[:,begin:end]
+
+            # Local Attn
+            att = np.einsum('blnd,bmnd->bnlm', trunc_q, trunc_k) * self.scale_dk
+            att = att + mask[:end-begin, :end-begin]
             att = np.softmax(att, dim=-1)
-            y = np.einsum('bnlm,bmnd->blnd', att, v)
-        y = y.reshape(B, L, self.hidden_dim)
+            trunc_x = np.einsum('bnlm,bmnd->blnd', att, trunc_v)
+
+            # Query Memroy
+            act_Q = np.elu(trunc_q) + 1
+            norm_z =  np.einsum('blhd,bhd->blh', act_Q, z)
+            A = np.einsum('blhd,bhdv->blhv', act_Q, M) / norm_z.unsqueeze(-1)
+            beta = np.sigmoid(self.beta)
+            x[:,begin:end] = beta * A + (1-beta) * trunc_x
+
+            # Update M,z
+            act_k = np.elu(trunc_k) + 1
+            norm_z = np.einsum('blhd,bhd->blh', act_k, z)
+            norm_x = np.einsum('blhd,bhdv->blhv', act_k, M) / norm_z.unsqueeze(-1)
+            z = z + np.einsum('blhd->bhd', act_k)
+            M = M + np.einsum('blhd,blhv->bhdv', act_k, trunc_x - norm_x)
+
+            begin = end
+
+        # -- Save state --
+        if state is not None:
+            state['Mz'] = (M.detach(),z.detach())
+        
+        # -- output --
+        x = x.reshape(B, L, self.hidden_dim)
         if self.xproj is not None:
-            return self.xproj.proj_out(y, go)
+            return self.xproj.proj_out(x, go)
         else:
-            return y
+            return x
     return __init__(nn.Module(forward=forward), **kwargs)
 
 # --- Example ---
 if __name__ == "__main__":
-    atten = AttentionBlock(
-        latent_dim = 384,
-        window_size = 128,
-        hidden_dim = 256,
-        k_dim = 384,
-        num_heads = 8,
-        num_kv_groups = 2
-    )
-    input = np.randn(50, 100, 384)
-    output = atten(input)
-    print(output.size())
+    roles = [
+        dict( 
+            name = 'InfiAttn',
+            vocab_dim = 64,
+            latent_dim = 384,
+            resident_gate = True,
+            gate='go',
+            xproj_heads = 4,
+            activation='silu',
+            dropout = 0.1,
+            bias = False, # bias in Linear?
+            layers = [
+               dict(
+                    name = 'InfiniteAttention',
+                    num_heads = 8,
+                    window_size = 128,
+                    rot_embedding = True,
+                    mixers = [
+                        dict(
+                            name = 'Conv1d'
+                        )
+                    ]
+                ), 
+                dict(
+                    name = "Xproj",
+                    hidden_dim = 384*3,
+                )
+            ] * 8
+        )
+    ]
+
+    from RomeArena import TrainRoles, RunRoles, PlotRoles
+    # PlotRoles(roles, np.load('examples/text/hawk-losses.ckt'))
+    l = TrainRoles(roles, lr = 6e-3, epochs=1, batch_size=4, show=True, show_frequency=2)
+    # RunRoles(roles, 'My lord Sebastian')

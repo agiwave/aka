@@ -4,7 +4,7 @@ import numpy
 from torch import *
 from torch.nn.functional import unfold, layer_norm, linear
 from torch.nn.functional import mse_loss, cross_entropy
-from torch.nn.functional import relu, gelu, silu, softplus, softmax
+from torch.nn.functional import relu, gelu, silu, softplus, softmax, elu
 from torch.nn.functional import embedding
 from torch.nn.functional import pad
 from torch.nn.functional import conv1d, conv2d, conv3d
