@@ -1,4 +1,3 @@
-import math
 import aka.nn as nn
 import aka.numpy as np
 
@@ -167,60 +166,56 @@ def CausalLM(**kwargs):
         
     return __init__(nn.Module(forward = forward, generate = generate, generator=generator),**kwargs)
 
-def CausalLMArgs(name):
-    mlp_args = dict(
-        name = 'Xproj',
-        hidden_dim = 384*4,
-    )
-    attn_args = dict(
-        name = 'Attention',
-        k_dim = 384,
-        hidden_dim = 384,
-        num_heads = 6,
-        num_kv_groups = 6,
-        rotary_embedding = True,
-    )
-    return dict(
-        vocab_size = 50304,
-        vocab_dim = 64,
-        block_size = 256,
-        latent_dim = 384,
-
-        dropout = 0.2,
-        bias = False, # do we use bias inside LayerNorm and Linear layers?
-        layers = [attn_args, mlp_args]*6,
-    )
-
 if __name__ == "__main__":
+    roles = [ 
+        dict(
+            name = 'CausalLM-demo',
+            vocab_size = 50304,
+            vocab_dim = 64,
+            block_size = 256,
+            latent_dim = 384,
+            dropout = 0.2,
+            bias = False,
+            layers = [
+                dict(
+                    name = 'Attention',
+                    k_dim = 384,
+                    hidden_dim = 384,
+                    num_heads = 6,
+                    num_kv_groups = 6,
+                    rotary_embedding = True,
+                ), 
+                dict(
+                    name = 'Xproj',
+                    hidden_dim = 384*4,
+                )
+            ]*6,
+        )
+    ]
     from RomeArena import TrainRoles, RunRoles
-    TrainRoles([
-        'CausalLM-demo'
-    ], lr = 6e-4, epochs=3)
-    # RunRoles([
-    #     'CausalLM-demo'
-    # ], "Paul Daniels (born 4 June 1981 in Burlington)")
+    TrainRoles(roles, lr = 6e-4, epochs=3)
+    # RunRoles(roles, "Paul Daniels (born 4 June 1981 in Burlington)")
 
+    # One by One
+    # for i in range(len(prompt_tokens)-1):
+    #     self(np.array([prompt_tokens[i:i+1]]), state=state)
+    # input_token_ids = np.array([prompt_tokens[-1:]])
 
-# One by One
-# for i in range(len(prompt_tokens)-1):
-#     self(np.array([prompt_tokens[i:i+1]]), state=state)
-# input_token_ids = np.array([prompt_tokens[-1:]])
+    # Without state
+    # if len(prompt_tokens) > 1:
+    #     self(np.array([prompt_tokens[:-1]]))
+    # input_token_ids = np.array([prompt_tokens])
+    # for _ in range(max_length):
+    #     outputs = self(input_token_ids)
+    #     output_token_ids = np.argmax(outputs[:,-1:,:], dim=-1)
+    #     cache = cache + output_token_ids[0].tolist()
+    #     if self.tokenizer.eos_token_id in input_token_ids:
+    #         break
 
-# Without state
-# if len(prompt_tokens) > 1:
-#     self(np.array([prompt_tokens[:-1]]))
-# input_token_ids = np.array([prompt_tokens])
-# for _ in range(max_length):
-#     outputs = self(input_token_ids)
-#     output_token_ids = np.argmax(outputs[:,-1:,:], dim=-1)
-#     cache = cache + output_token_ids[0].tolist()
-#     if self.tokenizer.eos_token_id in input_token_ids:
-#         break
+    #     word = self.tokenizer.decode(cache)
+    #     word_token_ids = self.tokenizer.encode(word)
+    #     if cache == word_token_ids:
+    #         cache = []
+    #         yield word
 
-#     word = self.tokenizer.decode(cache)
-#     word_token_ids = self.tokenizer.encode(word)
-#     if cache == word_token_ids:
-#         cache = []
-#         yield word
-
-#     input_token_ids = np.cat([input_token_ids, output_token_ids], dim=1)
+    #     input_token_ids = np.cat([input_token_ids, output_token_ids], dim=1)
