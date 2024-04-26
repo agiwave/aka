@@ -96,10 +96,14 @@ def InfiniteAttentionBlock(**kwargs):
 
         # -- attn --
         x = np.empty_like(v)
-        (begin, step) = (0, L if self.window_size is None else self.window_size)
-        mask = causal_mask((step, step), q.dtype, q.device, from_bottomright=True)
-        while begin < L:
-            end = begin + step if L-begin>step else L
+        (pos, step) = (0, L if self.window_size is None else self.window_size)
+        mask = cache.get('causal_mask', None)
+        if mask is None or mask.size(0) < L:
+            mask = causal_mask((step, step), q.dtype, q.device, from_bottomright=True)
+            cache['causal_mask'] = mask
+        while pos < L:
+            begin, end = (pos, pos + step if L-pos>step else L)
+            pos = end
 
             # Trunc Q，K，V
             trunc_q = q[:,begin:end]
@@ -107,10 +111,10 @@ def InfiniteAttentionBlock(**kwargs):
             trunc_v = v[:,begin:end]
 
             # Local Attn
-            att = np.einsum('blnd,bmnd->bnlm', trunc_q, trunc_k) * self.scale_dk
+            att = np.einsum('blhd,bmhd->bhlm', trunc_q, trunc_k) * self.scale_dk
             att = att + mask[:end-begin, :end-begin]
             att = np.softmax(att, dim=-1)
-            trunc_x = np.einsum('bnlm,bmnd->blnd', att, trunc_v)
+            trunc_x = np.einsum('bhlm,bmhd->blhd', att, trunc_v)
 
             # Query Memroy
             act_Q = np.elu(trunc_q) + 1
@@ -125,8 +129,6 @@ def InfiniteAttentionBlock(**kwargs):
             norm_x = np.einsum('blhd,bhdv->blhv', act_k, M) / norm_z.unsqueeze(-1)
             z = z + np.einsum('blhd->bhd', act_k)
             M = M + np.einsum('blhd,blhv->bhdv', act_k, trunc_x - norm_x)
-
-            begin = end
 
         # -- Save state --
         if state is not None:
@@ -152,7 +154,7 @@ if __name__ == "__main__":
             xproj_heads = 4,
             activation='silu',
             dropout = 0.1,
-            bias = False, # bias in Linear?
+            bias = False,
             layers = [
                dict(
                     name = 'InfiniteAttention',
